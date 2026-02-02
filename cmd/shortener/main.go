@@ -95,6 +95,7 @@ func mainPage(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	res.Header().Set("Location", shorts[req.URL.Path])
 	res.WriteHeader(http.StatusTemporaryRedirect)
 	res.Write([]byte(shorts[req.URL.Path]))
 }
