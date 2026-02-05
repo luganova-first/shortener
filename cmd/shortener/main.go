@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 )
@@ -25,88 +26,86 @@ func cryptoRandomString(length int) (string, error) {
 	return string(bytes), nil
 }
 
-// Хендлер основной страницы
-func MainPage(shorts Shorted) http.HandlerFunc {
+// Хендлер сокращения url
+func SetShort(shorts Shorted) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		// Проверяем методы запросов, должны быть только POST и GET
-		if req.Method != http.MethodGet && req.Method != http.MethodPost {
-			res.WriteHeader(http.StatusBadRequest)
-			return
-		}
-
 		// POST запрос должен быть с Content-Type `text/plain`
-		if req.Method == http.MethodPost && req.Header.Get("Content-Type") != "text/plain" {
+		if req.Header.Get("Content-Type") != "text/plain" {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		// Проверяем URL для POST запроса
-		if req.Method == http.MethodPost && req.URL.Path != "/" {
+		defer req.Body.Close()
+		body, err := io.ReadAll(req.Body)
+		if err != nil {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		// Если POST запрос, читаем параметры запроса, в параметрах должен быть URL для сокращения
-		if req.Method == http.MethodPost {
-			defer req.Body.Close()
-			body, err := io.ReadAll(req.Body)
+		if string(body) == "" {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		targetValue := string(body)
+
+		// Ищем body запроса в значениях уже сокращённых
+		var cryptoString string
+		for key, value := range shorts {
+			if value == targetValue {
+				cryptoString = key
+			}
+		}
+
+		if cryptoString == "" {
+			// Если не нашли, генерируем новое сокращение и записываем его в shorts
+			str, err := cryptoRandomString(8)
 			if err != nil {
-				res.WriteHeader(http.StatusBadRequest)
-				return
+				panic(err)
 			}
 
-			if string(body) == "" {
-				res.WriteHeader(http.StatusBadRequest)
-				return
-			}
+			cryptoString = str
 
-			targetValue := string(body)
-
-			// Ищем body запроса в значениях уже сокращённых
-			var cryptoString string
-			for key, value := range shorts {
-				if value == targetValue {
-					cryptoString = key
-				}
-			}
-
-			if cryptoString == "" {
-				// Если не нашли, генерируем новое сокращение и записываем его в shorts
-				str, err := cryptoRandomString(8)
-				if err != nil {
-					panic(err)
-				}
-
-				cryptoString = "/" + str
-
-				shorts[cryptoString] = targetValue
-			}
-
-			res.Header().Set("content-type", "text/plain")
-			res.WriteHeader(http.StatusCreated)
-			res.Write([]byte("http://" + req.Host + cryptoString))
-			return
+			shorts[cryptoString] = targetValue
 		}
+
+		res.Header().Set("content-type", "text/plain")
+		res.WriteHeader(http.StatusCreated)
+		res.Write([]byte("http://" + req.Host + "/" + cryptoString))
+	}
+}
+
+// Хендлер получения полного url по сокращённой ссылке
+func GetShort(shorts Shorted) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		short_id := chi.URLParam(req, "short_id")
 
 		// GET запрос, пытаемся найти сокращение в shorts по ключу
-		if shorts[req.URL.Path] == "" {
+		if shorts[short_id] == "" {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		res.Header().Set("Location", shorts[req.URL.Path])
+		res.Header().Set("Location", shorts[short_id])
 		res.WriteHeader(http.StatusTemporaryRedirect)
-		res.Write([]byte(shorts[req.URL.Path]))
+		res.Write([]byte(shorts[short_id]))
 	}
 }
 
 func main() {
 	shorts := make(Shorted)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, MainPage(shorts))
+	r := chi.NewRouter()
 
-	err := http.ListenAndServe(`:8080`, mux)
+	r.Post("/", SetShort(shorts))
+	r.Get("/{short_id}", GetShort(shorts))
+
+	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
+		res.WriteHeader(http.StatusBadRequest)
+		return
+	})
+
+	err := http.ListenAndServe(`:8080`, r)
 	if err != nil {
 		panic(err)
 	}
