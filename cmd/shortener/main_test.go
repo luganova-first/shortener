@@ -12,7 +12,7 @@ import (
 
 func TestMainPage(t *testing.T) {
 	shorts := make(Shorted)
-	var shortUrl string
+	var shortURL string
 
 	t.Run("wrong method", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPut, "/", nil)
@@ -85,11 +85,11 @@ func TestMainPage(t *testing.T) {
 		resBody, err := io.ReadAll(res.Body)
 
 		require.NoError(t, err)
-		shortUrl = string(resBody)
+		shortURL = string(resBody)
 	})
 
 	t.Run("ok get", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, shortUrl, nil)
+		request := httptest.NewRequest(http.MethodGet, shortURL, nil)
 		// создаём новый Recorder
 		w := httptest.NewRecorder()
 		h := http.HandlerFunc(MainPage(shorts))
