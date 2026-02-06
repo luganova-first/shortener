@@ -79,7 +79,6 @@ func SetShort(shorts Shorted) http.HandlerFunc {
 func GetShort(shorts Shorted) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		short_id := chi.URLParam(req, "short_id")
-
 		// GET запрос, пытаемся найти сокращение в shorts по ключу
 		if shorts[short_id] == "" {
 			res.WriteHeader(http.StatusBadRequest)
