@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,7 @@ import (
 
 func TestMainPage(t *testing.T) {
 	shorts := make(Shorted)
-	var shortUrl string
+	var shortURL string
 
 	t.Run("wrong method", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPut, "/", nil)
@@ -23,6 +24,7 @@ func TestMainPage(t *testing.T) {
 		res := w.Result()
 		// проверяем код ответа
 		assert.Equal(t, 400, res.StatusCode)
+		defer res.Body.Close()
 	})
 
 	t.Run("wrong content-type", func(t *testing.T) {
@@ -36,6 +38,7 @@ func TestMainPage(t *testing.T) {
 		res := w.Result()
 		// проверяем код ответа
 		assert.Equal(t, 400, res.StatusCode)
+		defer res.Body.Close()
 	})
 
 	t.Run("wrong url", func(t *testing.T) {
@@ -49,6 +52,7 @@ func TestMainPage(t *testing.T) {
 		res := w.Result()
 		// проверяем код ответа
 		assert.Equal(t, 400, res.StatusCode)
+		defer res.Body.Close()
 	})
 
 	t.Run("no body", func(t *testing.T) {
@@ -62,6 +66,7 @@ func TestMainPage(t *testing.T) {
 		res := w.Result()
 		// проверяем код ответа
 		assert.Equal(t, 400, res.StatusCode)
+		defer res.Body.Close()
 	})
 
 	t.Run("ok post", func(t *testing.T) {
@@ -76,12 +81,15 @@ func TestMainPage(t *testing.T) {
 		// проверяем код ответа
 		assert.Equal(t, 201, res.StatusCode)
 		assert.Equal(t, "text/plain", res.Header.Get("Content-Type"))
-		body, _ := io.ReadAll(res.Body)
-		shortUrl = string(body)
+		defer res.Body.Close()
+		resBody, err := io.ReadAll(res.Body)
+
+		require.NoError(t, err)
+		shortURL = string(resBody)
 	})
 
 	t.Run("ok get", func(t *testing.T) {
-		request := httptest.NewRequest(http.MethodGet, shortUrl, nil)
+		request := httptest.NewRequest(http.MethodGet, shortURL, nil)
 		// создаём новый Recorder
 		w := httptest.NewRecorder()
 		h := http.HandlerFunc(MainPage(shorts))
@@ -90,7 +98,10 @@ func TestMainPage(t *testing.T) {
 		res := w.Result()
 		// проверяем код ответа
 		assert.Equal(t, 307, res.StatusCode)
-		body, _ := io.ReadAll(res.Body)
-		assert.Equal(t, "https://practicum.yandex.ru/", string(body))
+		defer res.Body.Close()
+		resBody, err := io.ReadAll(res.Body)
+
+		require.NoError(t, err)
+		assert.Equal(t, "https://practicum.yandex.ru/", string(resBody))
 	})
 }
