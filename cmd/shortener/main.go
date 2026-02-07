@@ -101,7 +101,6 @@ func main() {
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
-		return
 	})
 
 	err := http.ListenAndServe(`:8080`, r)
