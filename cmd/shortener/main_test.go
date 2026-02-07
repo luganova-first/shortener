@@ -98,7 +98,7 @@ func TestGetShort(t *testing.T) {
 		w := httptest.NewRecorder()
 
 		r := chi.NewRouter()
-		r.Get("/{short_id}", GetShort(shorts))
+		r.Get("/{shortID}", GetShort(shorts))
 
 		r.ServeHTTP(w, request)
 

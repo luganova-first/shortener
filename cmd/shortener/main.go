@@ -78,16 +78,16 @@ func SetShort(shorts Shorted) http.HandlerFunc {
 // Хендлер получения полного url по сокращённой ссылке
 func GetShort(shorts Shorted) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		short_id := chi.URLParam(req, "short_id")
+		shortID := chi.URLParam(req, "shortID")
 		// GET запрос, пытаемся найти сокращение в shorts по ключу
-		if shorts[short_id] == "" {
+		if shorts[shortID] == "" {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		res.Header().Set("Location", shorts[short_id])
+		res.Header().Set("Location", shorts[shortID])
 		res.WriteHeader(http.StatusTemporaryRedirect)
-		res.Write([]byte(shorts[short_id]))
+		res.Write([]byte(shorts[shortID]))
 	}
 }
 
@@ -97,7 +97,7 @@ func main() {
 	r := chi.NewRouter()
 
 	r.Post("/", SetShort(shorts))
-	r.Get("/{short_id}", GetShort(shorts))
+	r.Get("/{shortID}", GetShort(shorts))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
