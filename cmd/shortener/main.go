@@ -2,9 +2,12 @@ package main
 
 import (
 	"crypto/rand"
-	"github.com/go-chi/chi/v5"
+	"github.com/luganova-first/shortener/internal/config"
 	"io"
 	"net/http"
+	"net/url"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // Хранилище сокращений, ключ -- хеш сокращения, значение -- сокращаемый URL
@@ -27,7 +30,7 @@ func cryptoRandomString(length int) (string, error) {
 }
 
 // Хендлер сокращения url
-func SetShort(shorts Shorted) http.HandlerFunc {
+func SetShort(shorts Shorted, baseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `text/plain`
 		if req.Header.Get("Content-Type") != "text/plain" {
@@ -49,6 +52,12 @@ func SetShort(shorts Shorted) http.HandlerFunc {
 
 		targetValue := string(body)
 
+		// Проверяем, что URL валиден
+		if _, err := url.ParseRequestURI(targetValue); err != nil {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
 		// Ищем body запроса в значениях уже сокращённых
 		var cryptoString string
 		for key, value := range shorts {
@@ -65,13 +74,15 @@ func SetShort(shorts Shorted) http.HandlerFunc {
 			}
 
 			cryptoString = str
-
 			shorts[cryptoString] = targetValue
 		}
 
 		res.Header().Set("content-type", "text/plain")
 		res.WriteHeader(http.StatusCreated)
-		res.Write([]byte("http://" + req.Host + "/" + cryptoString))
+
+		// Используем базовый URL из конфигурации
+		shortURL := baseURL + "/" + cryptoString
+		res.Write([]byte(shortURL))
 	}
 }
 
@@ -92,18 +103,27 @@ func GetShort(shorts Shorted) http.HandlerFunc {
 }
 
 func main() {
+	// Инициализация конфигурации
+	cfg := config.NewConfig()
+
+	// Валидация конфигурации
+	if err := cfg.Validate(); err != nil {
+		panic(err)
+	}
+
 	shorts := make(Shorted)
 
 	r := chi.NewRouter()
 
-	r.Post("/", SetShort(shorts))
+	// Передаем базовый URL в хендлер
+	r.Post("/", SetShort(shorts, cfg.BaseURL))
 	r.Get("/{shortID}", GetShort(shorts))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
 	})
 
-	err := http.ListenAndServe(`:8080`, r)
+	err := http.ListenAndServe(cfg.ServerAddress, r)
 	if err != nil {
 		panic(err)
 	}
