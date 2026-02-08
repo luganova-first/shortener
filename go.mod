@@ -1,4 +1,4 @@
-module github.com/luganova-first/shortener.git
+module github.com/luganova-first/shortener
 
 go 1.24.12
 
