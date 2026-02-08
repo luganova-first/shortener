@@ -15,12 +15,13 @@ import (
 func TestSetShort(t *testing.T) {
 	shorts := make(Shorted)
 	var shortURL string
+	baseURL := "http://localhost:8080/"
 
 	t.Run("wrong content-type", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts))
+		h := http.HandlerFunc(SetShort(shorts, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -32,7 +33,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/aaaaaaa", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts))
+		h := http.HandlerFunc(SetShort(shorts, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -44,7 +45,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts))
+		h := http.HandlerFunc(SetShort(shorts, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -56,7 +57,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts))
+		h := http.HandlerFunc(SetShort(shorts, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -74,7 +75,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts))
+		h := http.HandlerFunc(SetShort(shorts, baseURL))
 		h(w, request)
 
 		res := w.Result()
