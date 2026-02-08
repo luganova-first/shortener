@@ -2,7 +2,7 @@ package main
 
 import (
 	"crypto/rand"
-	"github.com/luganova-first/shortener/internal/config"
+	"shortener/internal/config"
 	"io"
 	"net/http"
 	"net/url"
