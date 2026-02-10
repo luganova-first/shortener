@@ -1,10 +1,11 @@
-package main
+package handler
 
 import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/luganova-first/shortener/internal/model"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -12,8 +13,10 @@ import (
 	"testing"
 )
 
+type Shorted map[string]string
+
 func TestSetShort(t *testing.T) {
-	shorts := make(Shorted)
+	shorts := make(model.Shorted)
 	var shortURL string
 	baseURL := "http://localhost:8080/"
 
@@ -88,7 +91,7 @@ func TestSetShort(t *testing.T) {
 }
 
 func TestGetShort(t *testing.T) {
-	shorts := make(Shorted)
+	shorts := make(model.Shorted)
 
 	testShort := "iPbLQebD"
 	testURL := fmt.Sprintf("/%s", testShort)
