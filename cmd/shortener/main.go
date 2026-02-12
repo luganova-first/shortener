@@ -4,8 +4,8 @@ import (
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
 	"github.com/luganova-first/shortener/internal/model"
-	"net/http"
 	"log"
+	"net/http"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -16,16 +16,16 @@ func main() {
 
 	// Валидация конфигурации
 	if err := cfg.Validate(); err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	shorts := make(model.Shorted)
+	storage := model.NewStorage()
 
 	r := chi.NewRouter()
 
 	// Передаем базовый URL в хендлер
-	r.Post("/", handler.SetShort(shorts, cfg.BaseURL))
-	r.Get("/{shortID}", handler.GetShort(shorts))
+	r.Post("/", handler.SetShort(storage, cfg.BaseURL))
+	r.Get("/{shortID}", handler.GetShort(storage))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)

@@ -1,17 +1,17 @@
 package handler
 
 import (
+	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/service"
 	"io"
 	"net/http"
 	"net/url"
-    "github.com/luganova-first/shortener/internal/model"
-    "github.com/luganova-first/shortener/internal/service"
 
 	"github.com/go-chi/chi/v5"
 )
 
 // Хендлер сокращения url
-func SetShort(shorts model.Shorted, baseURL string) http.HandlerFunc {
+func SetShort(storage *model.Storage, baseURL string) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `text/plain`
 		if req.Header.Get("Content-Type") != "text/plain" {
@@ -39,7 +39,11 @@ func SetShort(shorts model.Shorted, baseURL string) http.HandlerFunc {
 			return
 		}
 
-		shortURL := service.SetData( baseURL, targetValue, shorts )
+		shortURL, err := service.SetData(baseURL, targetValue, storage)
+		if err != nil {
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		res.Header().Set("content-type", "text/plain")
 		res.WriteHeader(http.StatusCreated)
@@ -48,11 +52,11 @@ func SetShort(shorts model.Shorted, baseURL string) http.HandlerFunc {
 }
 
 // Хендлер получения полного url по сокращённой ссылке
-func GetShort(shorts model.Shorted) http.HandlerFunc {
+func GetShort(storage *model.Storage) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		shortID := chi.URLParam(req, "shortID")
 
-        fullURL := service.GetData(shortID, shorts)
+		fullURL := service.GetData(shortID, storage)
 
 		if fullURL == "" {
 			res.WriteHeader(http.StatusBadRequest)

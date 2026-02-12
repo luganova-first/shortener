@@ -1,9 +1,11 @@
 package service
 
 import (
-    "crypto/rand"
+	"crypto/rand"
+	"fmt"
+	"net/url"
 
-    "github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/model"
 )
 
 // Генератор хеша сокращения
@@ -22,38 +24,42 @@ func cryptoRandomString(length int) (string, error) {
 	return string(bytes), nil
 }
 
-func SetData(baseURL string, targetValue string, shorts model.Shorted) string {
-    // Ищем body запроса в значениях уже сокращённых
-    var cryptoString string
-    for key, value := range shorts {
-        if value == targetValue {
-            cryptoString = key
-            break
-        }
-    }
+func SetData(baseURL string, targetValue string, storage *model.Storage) (string, error) {
+	// Ищем body запроса в значениях уже сокращённых
+	cryptoString := storage.GetFull(targetValue)
 
-    if cryptoString == "" {
-        // Если не нашли, генерируем новое сокращение и записываем его в shorts
-        for {
-            str, err := cryptoRandomString(8)
-            if err != nil {
-                panic(err)
-            }
+	if cryptoString == "" {
+		// Если не нашли, генерируем новое сокращение и записываем его в Shorted и в Full
+		for i := 1; i < 5; i++ {
+			str, err := cryptoRandomString(8)
+			if err != nil {
+				return "", err
+			}
 
-            // Если такого ключа ещё нет в shorts
-            // то записываем новое сокращение в shorts и цикл закончится.
-            // Если такой ключ уже есть, цикл повторится и сгенерируется новое значение ключа
-            if shorts[str] == "" {
-                cryptoString = str
-                shorts[cryptoString] = targetValue
-                break
-            }
-        }
-    }
+			// Если такого ключа ещё нет в Shorted
+			// то записываем новое сокращение в Shorted и в Full и цикл закончится.
+			// Если такой ключ уже есть, цикл повторится и сгенерируется новое значение ключа
+			if storage.Shorted[str] == "" {
+				cryptoString = str
+				storage.Shorted[cryptoString] = targetValue
+				storage.Full[targetValue] = cryptoString
+				break
+			}
+		}
 
-    return baseURL + "/" + cryptoString
+		if cryptoString == "" {
+			return "", fmt.Errorf("no cryptoString")
+		}
+	}
+
+	shortURL, err := url.JoinPath(baseURL, cryptoString)
+	if err != nil {
+		return "", err
+	}
+
+	return shortURL, nil
 }
 
-func GetData(shortID string, shorts model.Shorted) string {
-    return shorts[shortID]
+func GetData(shortID string, storage *model.Storage) string {
+	return storage.GetShort(shortID)
 }

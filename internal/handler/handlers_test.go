@@ -3,9 +3,9 @@ package handler
 import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/luganova-first/shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/luganova-first/shortener/internal/model"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,10 +13,8 @@ import (
 	"testing"
 )
 
-type Shorted map[string]string
-
 func TestSetShort(t *testing.T) {
-	shorts := make(model.Shorted)
+	storage := model.NewStorage()
 	var shortURL string
 	baseURL := "http://localhost:8080/"
 
@@ -24,7 +22,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts, baseURL))
+		h := http.HandlerFunc(SetShort(storage, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -36,7 +34,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/aaaaaaa", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts, baseURL))
+		h := http.HandlerFunc(SetShort(storage, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -48,7 +46,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts, baseURL))
+		h := http.HandlerFunc(SetShort(storage, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -60,7 +58,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts, baseURL))
+		h := http.HandlerFunc(SetShort(storage, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -78,7 +76,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(shorts, baseURL))
+		h := http.HandlerFunc(SetShort(storage, baseURL))
 		h(w, request)
 
 		res := w.Result()
@@ -91,18 +89,18 @@ func TestSetShort(t *testing.T) {
 }
 
 func TestGetShort(t *testing.T) {
-	shorts := make(model.Shorted)
+	storage := model.NewStorage()
 
 	testShort := "iPbLQebD"
 	testURL := fmt.Sprintf("/%s", testShort)
-	shorts[testShort] = "https://practicum.yandex.ru/"
+	storage.Shorted[testShort] = "https://practicum.yandex.ru/"
 
 	t.Run("ok get", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodGet, testURL, nil)
 		w := httptest.NewRecorder()
 
 		r := chi.NewRouter()
-		r.Get("/{shortID}", GetShort(shorts))
+		r.Get("/{shortID}", GetShort(storage))
 
 		r.ServeHTTP(w, request)
 
