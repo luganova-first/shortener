@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
+	"github.com/luganova-first/shortener/internal/logger"
 	"github.com/luganova-first/shortener/internal/model"
 	"log"
 	"net/http"
@@ -31,5 +32,5 @@ func main() {
 		res.WriteHeader(http.StatusBadRequest)
 	})
 
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, logger.WithLogging(r)))
 }
