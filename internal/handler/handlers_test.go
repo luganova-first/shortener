@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"github.com/luganova-first/shortener/internal/model"
@@ -112,4 +114,127 @@ func TestGetShort(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "https://practicum.yandex.ru/", string(resBody))
 	})
+}
+
+func TestJSONShort(t *testing.T) {
+	baseURL := "http://localhost:8080"
+	storage := model.NewStorage()
+
+	tests := []struct {
+		name              string
+		contentType       string
+		inputJSON         interface{}
+		expectedStatus    int
+		expectedResultKey string
+		validateResponse  func(t *testing.T, body []byte)
+	}{
+		{
+			name:           "successful request",
+			contentType:    "application/json",
+			inputJSON:      map[string]string{"url": "https://example.com"},
+			expectedStatus: http.StatusCreated,
+			validateResponse: func(t *testing.T, body []byte) {
+				var response map[string]string
+				err := json.Unmarshal(body, &response)
+				require.NoError(t, err)
+
+				result, ok := response["result"]
+				assert.True(t, ok, "response should have 'result' field")
+				assert.Contains(t, result, baseURL+"/", "result should contain base URL")
+			},
+		},
+		{
+			name:           "wrong content type",
+			contentType:    "text/plain",
+			inputJSON:      map[string]string{"url": "https://example.com"},
+			expectedStatus: http.StatusBadRequest,
+			validateResponse: func(t *testing.T, body []byte) {
+				assert.Empty(t, body, "body should be empty for bad content type")
+			},
+		},
+		{
+			name:           "invalid json",
+			contentType:    "application/json",
+			inputJSON:      "invalid json", // это будет передано как строка, но мы обработаем отдельно
+			expectedStatus: http.StatusBadRequest,
+			validateResponse: func(t *testing.T, body []byte) {
+				assert.NotEmpty(t, body, "body should contain error message")
+			},
+		},
+		{
+			name:           "invalid url format",
+			contentType:    "application/json",
+			inputJSON:      map[string]string{"url": "not-a-valid-url"},
+			expectedStatus: http.StatusBadRequest,
+			validateResponse: func(t *testing.T, body []byte) {
+				assert.Empty(t, body, "body should be empty for invalid URL")
+			},
+		},
+		{
+			name:           "empty url",
+			contentType:    "application/json",
+			inputJSON:      map[string]string{"url": ""},
+			expectedStatus: http.StatusBadRequest,
+			validateResponse: func(t *testing.T, body []byte) {
+				assert.Empty(t, body, "body should be empty for empty URL")
+			},
+		},
+		{
+			name:           "extra fields in json",
+			contentType:    "application/json",
+			inputJSON:      map[string]string{"url": "https://example.com", "extra": "field"},
+			expectedStatus: http.StatusCreated,
+			validateResponse: func(t *testing.T, body []byte) {
+				var response map[string]string
+				err := json.Unmarshal(body, &response)
+				require.NoError(t, err)
+				assert.Contains(t, response, "result")
+				assert.NotContains(t, response, "extra")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var reqBody []byte
+			var err error
+
+			// Подготовка тела запроса
+			switch v := tt.inputJSON.(type) {
+			case string:
+				if tt.name == "invalid json" {
+					reqBody = []byte("{invalid json}")
+				} else {
+					reqBody = []byte(v)
+				}
+			default:
+				reqBody, err = json.Marshal(tt.inputJSON)
+				require.NoError(t, err)
+			}
+
+			// Создаем запрос
+			req := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewReader(reqBody))
+			req.Header.Set("Content-Type", tt.contentType)
+
+			// Создаем ResponseRecorder
+			rr := httptest.NewRecorder()
+
+			// Вызываем обработчик
+			handler := JSONShort(storage, baseURL)
+			handler.ServeHTTP(rr, req)
+
+			// Проверяем статус код
+			assert.Equal(t, tt.expectedStatus, rr.Code, "handler returned wrong status code")
+
+			// Проверяем Content-Type для успешных запросов
+			if tt.expectedStatus == http.StatusCreated {
+				assert.Equal(t, "application/json", rr.Header().Get("Content-Type"), "wrong content type header")
+			}
+
+			// Валидируем ответ
+			if tt.validateResponse != nil {
+				tt.validateResponse(t, rr.Body.Bytes())
+			}
+		})
+	}
 }

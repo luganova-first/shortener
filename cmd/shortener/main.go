@@ -26,6 +26,7 @@ func main() {
 
 	// Передаем базовый URL в хендлер
 	r.Post("/", handler.SetShort(storage, cfg.BaseURL))
+	r.Post("/api/shorten", handler.JSONShort(storage, cfg.BaseURL))
 	r.Get("/{shortID}", handler.GetShort(storage))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
