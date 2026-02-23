@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/repository"
 )
 
 // Генератор хеша сокращения
@@ -43,6 +44,10 @@ func SetData(baseURL string, targetValue string, storage *model.Storage) (string
 				cryptoString = str
 				storage.Shorted[cryptoString] = targetValue
 				storage.Full[targetValue] = cryptoString
+
+				// Перезаписываем файл с данными Storage
+				repository.WriteStorageToFile(storage)
+
 				break
 			}
 		}

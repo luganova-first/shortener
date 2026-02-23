@@ -1,11 +1,13 @@
 package main
 
 import (
+	// "fmt"
 	"github.com/luganova-first/shortener/internal/archiver"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
 	"github.com/luganova-first/shortener/internal/logger"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/repository"
 	"log"
 	"net/http"
 
@@ -22,6 +24,7 @@ func main() {
 	}
 
 	storage := model.NewStorage()
+	storage = repository.FillStorageFromFile(storage)
 
 	r := chi.NewRouter()
 

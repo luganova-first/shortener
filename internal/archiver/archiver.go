@@ -4,7 +4,7 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-    "strings"
+	"strings"
 )
 
 // compressWriter реализует интерфейс http.ResponseWriter и позволяет прозрачно для сервера

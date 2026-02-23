@@ -93,31 +93,31 @@ func TestGzipHandler_DecompressRequest(t *testing.T) {
 	}))
 
 	tests := []struct {
-		name              string
-		contentEncoding   string
-		compressRequest   bool
-		expectedStatus    int
+		name               string
+		contentEncoding    string
+		compressRequest    bool
+		expectedStatus     int
 		expectDecompressed bool
 	}{
 		{
-			name:              "запрос с gzip сжатием",
-			contentEncoding:   "gzip",
-			compressRequest:   true,
-			expectedStatus:    http.StatusOK,
+			name:               "запрос с gzip сжатием",
+			contentEncoding:    "gzip",
+			compressRequest:    true,
+			expectedStatus:     http.StatusOK,
 			expectDecompressed: true,
 		},
 		{
-			name:              "запрос без сжатия",
-			contentEncoding:   "",
-			compressRequest:   false,
-			expectedStatus:    http.StatusOK,
+			name:               "запрос без сжатия",
+			contentEncoding:    "",
+			compressRequest:    false,
+			expectedStatus:     http.StatusOK,
 			expectDecompressed: false,
 		},
 		{
-			name:              "запрос с другой кодировкой",
-			contentEncoding:   "deflate",
-			compressRequest:   false,
-			expectedStatus:    http.StatusOK,
+			name:               "запрос с другой кодировкой",
+			contentEncoding:    "deflate",
+			compressRequest:    false,
+			expectedStatus:     http.StatusOK,
 			expectDecompressed: false,
 		},
 	}
