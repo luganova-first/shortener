@@ -9,8 +9,9 @@ import (
 
 // Config хранит конфигурацию сервера
 type Config struct {
-	ServerAddress string // Адрес запуска HTTP-сервера
-	BaseURL       string // Базовый адрес для сокращенных URL
+	ServerAddress   string // Адрес запуска HTTP-сервера
+	BaseURL         string // Базовый адрес для сокращенных URL
+	StorageFileName string // Имя файла для записи данных Storage
 }
 
 // NewConfig создает и инициализирует конфигурацию из аргументов командной строки
@@ -18,15 +19,18 @@ func NewConfig() *Config {
 	cfg := &Config{}
 
 	defaultServerAddr := "localhost:8080"
+	defaultStorageFileName := "Storage.txt"
 
 	// Берём адреса из переменных окружения
 	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
 	cfg.BaseURL = os.Getenv("BASE_URL")
+	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
 
 	// Если адресов нет, определяем флаги
-	if cfg.ServerAddress == "" || cfg.BaseURL == "" {
+	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" {
 		serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
 		baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
+		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
 		flag.Parse()
 
 		if cfg.ServerAddress == "" {
@@ -50,6 +54,16 @@ func NewConfig() *Config {
 				}
 			}
 			cfg.BaseURL = *baseURL
+		}
+
+		if cfg.StorageFileName == "" {
+			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
+			if *fileName == "" {
+				*fileName = defaultStorageFileName
+			}
+
+			// Устанавливаем значения
+			cfg.StorageFileName = *fileName
 		}
 	}
 

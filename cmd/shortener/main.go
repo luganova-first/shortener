@@ -24,13 +24,13 @@ func main() {
 	}
 
 	storage := model.NewStorage()
-	storage = repository.FillStorageFromFile(storage)
+	storage = repository.FillStorageFromFile(storage, cfg)
 
 	r := chi.NewRouter()
 
 	// Передаем базовый URL в хендлер
-	r.Post("/", handler.SetShort(storage, cfg.BaseURL))
-	r.Post("/api/shorten", handler.JSONShort(storage, cfg.BaseURL))
+	r.Post("/", handler.SetShort(storage, cfg))
+	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
 	r.Get("/{shortID}", handler.GetShort(storage))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {

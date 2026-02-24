@@ -2,8 +2,9 @@ package repository
 
 import (
 	"encoding/json"
-	"flag"
+	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -55,32 +56,8 @@ func (fr *FileReader) Close() error {
 	return fr.file.Close()
 }
 
-// Получаем имя файла для записи данных.
-// Сначала из переменной окружения "FILE_STORAGE_PATH",
-// если её нет, то из флага -f, если и его нет, то ставим по умолчанию
-func GetStorageFileName() string {
-	defaultStorageFileName := "Storage.txt"
-
-	storageFileName := os.Getenv("FILE_STORAGE_PATH")
-
-	if storageFileName == "" {
-		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
-		flag.Parse()
-
-		if storageFileName == "" {
-			if *fileName == "" {
-				*fileName = defaultStorageFileName
-			}
-
-			storageFileName = *fileName
-		}
-	}
-
-	return storageFileName
-}
-
-func FillStorageFromFile(s *model.Storage) *model.Storage {
-	storageFileName := GetStorageFileName()
+func FillStorageFromFile(s *model.Storage, cfg *config.Config) *model.Storage {
+	storageFileName := cfg.StorageFileName
 
 	fileReader, err := NewFileReader(storageFileName)
 	if err != nil {
@@ -95,7 +72,7 @@ func FillStorageFromFile(s *model.Storage) *model.Storage {
 
 	// Чтение и парсинг JSON
 	err = decoder.Decode(&storageRows)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		log.Fatal(err)
 	}
 
@@ -107,8 +84,8 @@ func FillStorageFromFile(s *model.Storage) *model.Storage {
 	return s
 }
 
-func WriteStorageToFile(s *model.Storage) {
-	storageFileName := GetStorageFileName()
+func WriteStorageToFile(s *model.Storage, cfg *config.Config) {
+	storageFileName := cfg.StorageFileName
 
 	fileWriter, err := NewFileWriter(storageFileName)
 	if err != nil {

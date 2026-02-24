@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
 )
@@ -25,7 +26,9 @@ func cryptoRandomString(length int) (string, error) {
 	return string(bytes), nil
 }
 
-func SetData(baseURL string, targetValue string, storage *model.Storage) (string, error) {
+func SetData(targetValue string, storage *model.Storage, cfg *config.Config) (string, error) {
+	baseURL := cfg.BaseURL
+
 	// Ищем body запроса в значениях уже сокращённых
 	cryptoString := storage.GetFull(targetValue)
 
@@ -46,7 +49,7 @@ func SetData(baseURL string, targetValue string, storage *model.Storage) (string
 				storage.Full[targetValue] = cryptoString
 
 				// Перезаписываем файл с данными Storage
-				repository.WriteStorageToFile(storage)
+				repository.WriteStorageToFile(storage, cfg)
 
 				break
 			}

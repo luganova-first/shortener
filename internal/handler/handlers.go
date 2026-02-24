@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/service"
 	"io"
@@ -21,7 +22,7 @@ type outJSONData struct {
 }
 
 // Хендлер сокращения url
-func SetShort(storage *model.Storage, baseURL string) http.HandlerFunc {
+func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `text/plain`
 		if req.Header.Get("Content-Type") != "text/plain" {
@@ -49,7 +50,7 @@ func SetShort(storage *model.Storage, baseURL string) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := service.SetData(baseURL, targetValue, storage)
+		shortURL, err := service.SetData(targetValue, storage, cfg)
 		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
@@ -63,7 +64,7 @@ func SetShort(storage *model.Storage, baseURL string) http.HandlerFunc {
 
 // Хендлер сокращения url, который будет принимать в теле запроса JSON-объект {"url":"<some_url>"}
 // и возвращать в ответ объект {"result":"<short_url>"}.
-func JSONShort(storage *model.Storage, baseURL string) http.HandlerFunc {
+func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `application/json`
 		if req.Header.Get("Content-Type") != "application/json" {
@@ -94,7 +95,7 @@ func JSONShort(storage *model.Storage, baseURL string) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := service.SetData(baseURL, targetValue, storage)
+		shortURL, err := service.SetData(targetValue, storage, cfg)
 		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return

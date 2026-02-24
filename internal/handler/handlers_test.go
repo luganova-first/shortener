@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
+	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,16 +16,20 @@ import (
 	"testing"
 )
 
+var cfg *config.Config
+var storage *model.Storage
+
 func TestSetShort(t *testing.T) {
-	storage := model.NewStorage()
+	cfg = config.NewConfig()
+	storage = model.NewStorage()
+
 	var shortURL string
-	baseURL := "http://localhost:8080/"
 
 	t.Run("wrong content-type", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, baseURL))
+		h := http.HandlerFunc(SetShort(storage, cfg))
 		h(w, request)
 
 		res := w.Result()
@@ -36,7 +41,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/aaaaaaa", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, baseURL))
+		h := http.HandlerFunc(SetShort(storage, cfg))
 		h(w, request)
 
 		res := w.Result()
@@ -48,7 +53,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, baseURL))
+		h := http.HandlerFunc(SetShort(storage, cfg))
 		h(w, request)
 
 		res := w.Result()
@@ -60,7 +65,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, baseURL))
+		h := http.HandlerFunc(SetShort(storage, cfg))
 		h(w, request)
 
 		res := w.Result()
@@ -78,7 +83,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, baseURL))
+		h := http.HandlerFunc(SetShort(storage, cfg))
 		h(w, request)
 
 		res := w.Result()
@@ -91,8 +96,6 @@ func TestSetShort(t *testing.T) {
 }
 
 func TestGetShort(t *testing.T) {
-	storage := model.NewStorage()
-
 	testShort := "iPbLQebD"
 	testURL := fmt.Sprintf("/%s", testShort)
 	storage.Shorted[testShort] = "https://practicum.yandex.ru/"
@@ -117,8 +120,7 @@ func TestGetShort(t *testing.T) {
 }
 
 func TestJSONShort(t *testing.T) {
-	baseURL := "http://localhost:8080"
-	storage := model.NewStorage()
+	baseURL := cfg.BaseURL
 
 	tests := []struct {
 		name              string
@@ -220,7 +222,7 @@ func TestJSONShort(t *testing.T) {
 			rr := httptest.NewRecorder()
 
 			// Вызываем обработчик
-			handler := JSONShort(storage, baseURL)
+			handler := JSONShort(storage, cfg)
 			handler.ServeHTTP(rr, req)
 
 			// Проверяем статус код
