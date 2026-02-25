@@ -3,44 +3,78 @@ package config
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 )
 
 // Config хранит конфигурацию сервера
 type Config struct {
-	ServerAddress string // Адрес запуска HTTP-сервера
-	BaseURL       string // Базовый адрес для сокращенных URL
+	ServerAddress   string // Адрес запуска HTTP-сервера
+	BaseURL         string // Базовый адрес для сокращенных URL
+	StorageFileName string // Имя файла для записи данных Storage
 }
 
 // NewConfig создает и инициализирует конфигурацию из аргументов командной строки
 func NewConfig() *Config {
 	cfg := &Config{}
 
-	// Определяем флаги
-	serverAddr := flag.String("a", "localhost:8080", "Адрес запуска HTTP-сервера")
-	baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
+	defaultServerAddr := "localhost:8080"
+	defaultStorageFileName := "Storage.txt"
 
-	flag.Parse()
+	// Берём адреса из переменных окружения
+	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
+	cfg.BaseURL = os.Getenv("BASE_URL")
+	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
 
-	// Устанавливаем значения из флагов
-	cfg.ServerAddress = *serverAddr
+	// Если адресов нет, определяем флаги
+	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" {
+		serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
+		baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
+		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
+		flag.Parse()
 
-	// Если базовый URL не указан, формируем его из адреса сервера
-	if *baseURL == "" {
-		// Добавляем http:// если его нет в адресе сервера
-		if !strings.HasPrefix(cfg.ServerAddress, "http://") && !strings.HasPrefix(cfg.ServerAddress, "https://") {
-			*baseURL = "http://" + cfg.ServerAddress
-		} else {
-			*baseURL = cfg.ServerAddress
+		if cfg.ServerAddress == "" {
+			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
+			if *serverAddr == "" {
+				*serverAddr = defaultServerAddr
+			}
+
+			// Устанавливаем значения
+			cfg.ServerAddress = *serverAddr
+		}
+
+		if cfg.BaseURL == "" {
+			// Если базовый URL никак не указан, формируем его из адреса сервера
+			if *baseURL == "" {
+				// Добавляем http:// если его нет в адресе сервера
+				if !strings.HasPrefix(cfg.ServerAddress, "http://") && !strings.HasPrefix(cfg.ServerAddress, "https://") {
+					*baseURL = "http://" + cfg.ServerAddress
+				} else {
+					*baseURL = cfg.ServerAddress
+				}
+			}
+			cfg.BaseURL = *baseURL
+		}
+
+		if cfg.StorageFileName == "" {
+			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
+			if *fileName == "" {
+				*fileName = defaultStorageFileName
+			}
+
+			// Устанавливаем значения
+			cfg.StorageFileName = *fileName
 		}
 	}
-	cfg.BaseURL = *baseURL
 
 	return cfg
 }
 
 // Validate проверяет корректность конфигурации
 func (c *Config) Validate() error {
+	c.ServerAddress = strings.ReplaceAll(c.ServerAddress, " ", "")
+	c.BaseURL = strings.ReplaceAll(c.BaseURL, " ", "")
+
 	if c.ServerAddress == "" {
 		return fmt.Errorf("server address cannot be empty")
 	}

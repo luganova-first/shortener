@@ -1,9 +1,13 @@
 package main
 
 import (
+	// "fmt"
+	"github.com/luganova-first/shortener/internal/archiver"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
+	"github.com/luganova-first/shortener/internal/logger"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/repository"
 	"log"
 	"net/http"
 
@@ -19,17 +23,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	storage := model.NewStorage()
+	storage, err := repository.FillStorageFromFile(model.NewStorage(), cfg)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	r := chi.NewRouter()
 
 	// Передаем базовый URL в хендлер
-	r.Post("/", handler.SetShort(storage, cfg.BaseURL))
-	r.Get("/{shortID}", handler.GetShort(storage))
+	r.Post("/", handler.SetShort(storage, cfg))
+	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
+	r.Get("/{shortID}", handler.GetShort(storage, cfg))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
 	})
 
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, r))
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, archiver.GzipHandler(logger.WithLogging(r))))
 }

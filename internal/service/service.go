@@ -1,37 +1,40 @@
 package service
 
 import (
-	"crypto/rand"
 	"fmt"
 	"net/url"
 
+	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/repository"
+	"github.com/luganova-first/shortener/pkg"
 )
 
-// Генератор хеша сокращения
-func cryptoRandomString(length int) (string, error) {
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-
-	bytes := make([]byte, length)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-
-	for i := range bytes {
-		bytes[i] = charset[bytes[i]%byte(len(charset))]
-	}
-
-	return string(bytes), nil
+// ShortenerService представляет сервис для работы с сокращением ссылок
+type ShortenerService struct {
+	storage *model.Storage
+	config  *config.Config
 }
 
-func SetData(baseURL string, targetValue string, storage *model.Storage) (string, error) {
+// NewShortenerService создает новый экземпляр сервиса
+func NewShortenerService(storage *model.Storage, cfg *config.Config) *ShortenerService {
+	return &ShortenerService{
+		storage: storage,
+		config:  cfg,
+	}
+}
+
+// SetData сохраняет данные и возвращает сокращенный URL
+func (s *ShortenerService) SetData(targetValue string) (string, error) {
+	baseURL := s.config.BaseURL
+
 	// Ищем body запроса в значениях уже сокращённых
-	cryptoString := storage.GetFull(targetValue)
+	cryptoString := s.storage.GetFull(targetValue)
 
 	if cryptoString == "" {
 		// Если не нашли, генерируем новое сокращение и записываем его в Shorted и в Full
 		for i := 1; i < 5; i++ {
-			str, err := cryptoRandomString(8)
+			str, err := pkg.CryptoRandomString(8)
 			if err != nil {
 				return "", err
 			}
@@ -39,10 +42,16 @@ func SetData(baseURL string, targetValue string, storage *model.Storage) (string
 			// Если такого ключа ещё нет в Shorted
 			// то записываем новое сокращение в Shorted и в Full и цикл закончится.
 			// Если такой ключ уже есть, цикл повторится и сгенерируется новое значение ключа
-			if storage.Shorted[str] == "" {
+			if s.storage.Shorted[str] == "" {
 				cryptoString = str
-				storage.Shorted[cryptoString] = targetValue
-				storage.Full[targetValue] = cryptoString
+				s.storage.Shorted[cryptoString] = targetValue
+				s.storage.Full[targetValue] = cryptoString
+
+				// Перезаписываем файл с данными Storage
+				if err := repository.WriteStorageToFile(s.storage, s.config); err != nil {
+					return "", err
+				}
+
 				break
 			}
 		}
@@ -60,6 +69,7 @@ func SetData(baseURL string, targetValue string, storage *model.Storage) (string
 	return shortURL, nil
 }
 
-func GetData(shortID string, storage *model.Storage) string {
-	return storage.GetShort(shortID)
+// GetData получает данные по короткому идентификатору
+func (s *ShortenerService) GetData(shortID string) string {
+	return s.storage.GetShort(shortID)
 }
