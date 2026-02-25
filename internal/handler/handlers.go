@@ -50,7 +50,9 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := service.SetData(targetValue, storage, cfg)
+		s := service.NewShortenerService(storage, cfg)
+
+		shortURL, err := s.SetData(targetValue)
 		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
@@ -95,7 +97,9 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		shortURL, err := service.SetData(targetValue, storage, cfg)
+		s := service.NewShortenerService(storage, cfg)
+
+		shortURL, err := s.SetData(targetValue)
 		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
@@ -118,11 +122,13 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 }
 
 // Хендлер получения полного url по сокращённой ссылке
-func GetShort(storage *model.Storage) http.HandlerFunc {
+func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		shortID := chi.URLParam(req, "shortID")
 
-		fullURL := service.GetData(shortID, storage)
+		s := service.NewShortenerService(storage, cfg)
+
+		fullURL := s.GetData(shortID)
 
 		if fullURL == "" {
 			res.WriteHeader(http.StatusBadRequest)

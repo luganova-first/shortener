@@ -5,7 +5,6 @@ import (
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"io"
-	"log"
 	"os"
 	"strconv"
 )
@@ -56,12 +55,12 @@ func (fr *FileReader) Close() error {
 	return fr.file.Close()
 }
 
-func FillStorageFromFile(s *model.Storage, cfg *config.Config) *model.Storage {
+func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
 	storageFileName := cfg.StorageFileName
 
 	fileReader, err := NewFileReader(storageFileName)
 	if err != nil {
-		log.Fatal(err)
+		return s, err
 	}
 	defer fileReader.Close()
 
@@ -73,7 +72,7 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) *model.Storage {
 	// Чтение и парсинг JSON
 	err = decoder.Decode(&storageRows)
 	if err != nil && err != io.EOF {
-		log.Fatal(err)
+		return s, err
 	}
 
 	for _, row := range storageRows {
@@ -81,15 +80,15 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) *model.Storage {
 		s.Full[row.OriginalURL] = row.ShortURL
 	}
 
-	return s
+	return s, nil
 }
 
-func WriteStorageToFile(s *model.Storage, cfg *config.Config) {
+func WriteStorageToFile(s *model.Storage, cfg *config.Config) error {
 	storageFileName := cfg.StorageFileName
 
 	fileWriter, err := NewFileWriter(storageFileName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer fileWriter.Close()
 
@@ -115,6 +114,8 @@ func WriteStorageToFile(s *model.Storage, cfg *config.Config) {
 	// Записываем массив в файл
 	err = encoder.Encode(storageRows)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+
+	return nil
 }
