@@ -33,6 +33,7 @@ func main() {
 	// Передаем базовый URL в хендлер
 	r.Post("/", handler.SetShort(storage, cfg))
 	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
+	r.Get("/ping", handler.GetDB(cfg))
 	r.Get("/{shortID}", handler.GetShort(storage, cfg))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {

@@ -12,6 +12,7 @@ type Config struct {
 	ServerAddress   string // Адрес запуска HTTP-сервера
 	BaseURL         string // Базовый адрес для сокращенных URL
 	StorageFileName string // Имя файла для записи данных Storage
+	DBconnStr       string // Строка с адресом подключения к БД
 }
 
 // NewConfig создает и инициализирует конфигурацию из аргументов командной строки
@@ -25,12 +26,14 @@ func NewConfig() *Config {
 	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
 	cfg.BaseURL = os.Getenv("BASE_URL")
 	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
+	cfg.DBconnStr = os.Getenv("DATABASE_DSN")
 
 	// Если адресов нет, определяем флаги
-	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" {
+	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" || cfg.DBconnStr == "" {
 		serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
 		baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
 		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
+		dbStr := flag.String("d", "", "Строка с адресом подключения к БД")
 		flag.Parse()
 
 		if cfg.ServerAddress == "" {
@@ -65,6 +68,11 @@ func NewConfig() *Config {
 			// Устанавливаем значения
 			cfg.StorageFileName = *fileName
 		}
+
+		if cfg.DBconnStr == "" {
+			// Устанавливаем значения
+			cfg.DBconnStr = *dbStr
+		}
 	}
 
 	return cfg
@@ -80,6 +88,9 @@ func (c *Config) Validate() error {
 	}
 	if c.BaseURL == "" {
 		return fmt.Errorf("base URL cannot be empty")
+	}
+	if c.StorageFileName == "" {
+		return fmt.Errorf("Storage file name cannot be empty")
 	}
 	return nil
 }

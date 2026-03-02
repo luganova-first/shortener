@@ -1,7 +1,9 @@
 package repository
 
 import (
+	"database/sql"
 	"encoding/json"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"io"
@@ -118,4 +120,14 @@ func WriteStorageToFile(s *model.Storage, cfg *config.Config) error {
 	}
 
 	return nil
+}
+
+func DB(cfg *config.Config) (*sql.DB, error) {
+	db, err := sql.Open("pgx", cfg.DBconnStr)
+	if err != nil {
+		return db, err
+	}
+	defer db.Close()
+
+	return db, nil
 }
