@@ -90,7 +90,7 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("base URL cannot be empty")
 	}
 	if c.StorageFileName == "" {
-		return fmt.Errorf("Storage file name cannot be empty")
+		return fmt.Errorf("storage file name cannot be empty")
 	}
 	return nil
 }
