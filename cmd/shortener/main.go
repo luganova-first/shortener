@@ -23,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	storage, err := repository.FillStorageFromFile(model.NewStorage(), cfg)
+	storage, err := repository.FillStorage(model.NewStorage(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

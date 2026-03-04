@@ -20,7 +20,6 @@ func NewConfig() *Config {
 	cfg := &Config{}
 
 	defaultServerAddr := "localhost:8080"
-	defaultStorageFileName := "Storage.txt"
 
 	// Берём адреса из переменных окружения
 	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
@@ -32,7 +31,7 @@ func NewConfig() *Config {
 	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" || cfg.DBconnStr == "" {
 		serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
 		baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
-		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
+		fileName := flag.String("f", "", "Файл для записи Storage")
 		dbStr := flag.String("d", "", "Строка с адресом подключения к БД")
 		flag.Parse()
 
@@ -60,11 +59,6 @@ func NewConfig() *Config {
 		}
 
 		if cfg.StorageFileName == "" {
-			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
-			if *fileName == "" {
-				*fileName = defaultStorageFileName
-			}
-
 			// Устанавливаем значения
 			cfg.StorageFileName = *fileName
 		}
@@ -88,9 +82,6 @@ func (c *Config) Validate() error {
 	}
 	if c.BaseURL == "" {
 		return fmt.Errorf("base URL cannot be empty")
-	}
-	if c.StorageFileName == "" {
-		return fmt.Errorf("storage file name cannot be empty")
 	}
 	return nil
 }

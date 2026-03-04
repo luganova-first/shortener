@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -85,6 +86,51 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 	return s, nil
 }
 
+func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
+    rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
+    if err != nil {
+        return s, err
+    }
+
+    // обязательно закрываем перед возвратом функции
+    defer rows.Close()
+
+    // пробегаем по всем записям
+    for rows.Next() {
+        var shorted string
+        var full string
+        err = rows.Scan(&shorted, &full)
+        if err != nil {
+            return s, err
+        }
+
+        s.Shorted[shorted] = full
+		s.Full[full] = shorted
+    }
+
+    // проверяем на ошибки
+    err = rows.Err()
+    if err != nil {
+        return s, err
+    }
+    return s, nil
+}
+
+func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
+	switch {
+		case cfg.DBconnStr != "":
+			db, err := DB(cfg)
+			if err != nil {
+				return s, err
+			}
+			return FillStorageFromDB(context.Background(), db, s)
+		case cfg.StorageFileName != "":
+			return FillStorageFromFile(s, cfg)
+	}
+
+	return s, nil
+}
+
 func WriteStorageToFile(s *model.Storage, cfg *config.Config) error {
 	storageFileName := cfg.StorageFileName
 
@@ -130,4 +176,44 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 	defer db.Close()
 
 	return db, nil
+}
+
+func InsertNewShort(db *sql.DB, shorted string, full string) error {
+    _, err := db.Exec("INSERT INTO shorts (shorted, full) VALUES ($1, $2)", shorted, full)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
+	db, err := DB(cfg)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec("TRUNCATE TABLE shorts")
+    if err != nil {
+        return err
+    }
+
+    for key, value := range s.Shorted {
+		err := InsertNewShort(db, key, value)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func SaveStorage(s *model.Storage, cfg *config.Config) error {
+	switch {
+		case cfg.DBconnStr != "":
+			return WriteStorageToDB(s, cfg)
+		case cfg.StorageFileName != "":
+			return WriteStorageToFile(s, cfg)
+	}
+
+	return nil
 }

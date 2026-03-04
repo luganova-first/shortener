@@ -47,8 +47,8 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 				s.storage.Shorted[cryptoString] = targetValue
 				s.storage.Full[targetValue] = cryptoString
 
-				// Перезаписываем файл с данными Storage
-				if err := repository.WriteStorageToFile(s.storage, s.config); err != nil {
+				// Сохраняем Storage
+				if err := repository.SaveStorage(s.storage, s.config); err != nil {
 					return "", err
 				}
 
