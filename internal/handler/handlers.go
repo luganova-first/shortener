@@ -145,11 +145,12 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 // Хендлер получения подключения к базе данных
 func GetDB(cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
-		_, err := repository.DB(cfg)
+		db, err := repository.DB(cfg)
 		if err != nil {
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		defer db.Close()
 
 		res.WriteHeader(http.StatusOK)
 	}

@@ -87,45 +87,45 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 }
 
 func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
-    rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
-    if err != nil {
-        return s, err
-    }
+	rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
+	if err != nil {
+		return s, err
+	}
 
-    // обязательно закрываем перед возвратом функции
-    defer rows.Close()
+	// обязательно закрываем перед возвратом функции
+	defer rows.Close()
 
-    // пробегаем по всем записям
-    for rows.Next() {
-        var shorted string
-        var full string
-        err = rows.Scan(&shorted, &full)
-        if err != nil {
-            return s, err
-        }
-
-        s.Shorted[shorted] = full
+	// пробегаем по всем записям
+	for rows.Next() {
+		var shorted string
+		var full string
+		err = rows.Scan(&shorted, &full)
+		if err != nil {
+			return s, err
+		}
+		s.Shorted[shorted] = full
 		s.Full[full] = shorted
-    }
+	}
 
-    // проверяем на ошибки
-    err = rows.Err()
-    if err != nil {
-        return s, err
-    }
-    return s, nil
+	// проверяем на ошибки
+	err = rows.Err()
+	if err != nil {
+		return s, err
+	}
+	return s, nil
 }
 
 func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
 	switch {
-		case cfg.DBconnStr != "":
-			db, err := DB(cfg)
-			if err != nil {
-				return s, err
-			}
-			return FillStorageFromDB(context.Background(), db, s)
-		case cfg.StorageFileName != "":
-			return FillStorageFromFile(s, cfg)
+	case cfg.DBconnStr != "":
+		db, err := DB(cfg)
+		if err != nil {
+			return s, err
+		}
+		defer db.Close()
+		return FillStorageFromDB(context.Background(), db, s)
+	case cfg.StorageFileName != "":
+		return FillStorageFromFile(s, cfg)
 	}
 
 	return s, nil
@@ -173,17 +173,16 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 	if err != nil {
 		return db, err
 	}
-	defer db.Close()
 
 	return db, nil
 }
 
 func InsertNewShort(db *sql.DB, shorted string, full string) error {
-    _, err := db.Exec("INSERT INTO shorts (shorted, full) VALUES ($1, $2)", shorted, full)
-    if err != nil {
-        return err
-    }
-    return nil
+	_, err := db.Exec("INSERT INTO shorts (shorted, full) VALUES ($1, $2)", shorted, full)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
@@ -191,13 +190,14 @@ func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+	defer db.Close()
 
 	_, err = db.Exec("TRUNCATE TABLE shorts")
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    for key, value := range s.Shorted {
+	for key, value := range s.Shorted {
 		err := InsertNewShort(db, key, value)
 		if err != nil {
 			return err
@@ -209,10 +209,10 @@ func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
 
 func SaveStorage(s *model.Storage, cfg *config.Config) error {
 	switch {
-		case cfg.DBconnStr != "":
-			return WriteStorageToDB(s, cfg)
-		case cfg.StorageFileName != "":
-			return WriteStorageToFile(s, cfg)
+	case cfg.DBconnStr != "":
+		return WriteStorageToDB(s, cfg)
+	case cfg.StorageFileName != "":
+		return WriteStorageToFile(s, cfg)
 	}
 
 	return nil
