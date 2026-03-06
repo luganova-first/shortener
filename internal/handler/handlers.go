@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"bytes"
 	"encoding/json"
 	"github.com/luganova-first/shortener/internal/config"
@@ -147,6 +148,7 @@ func GetDB(cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		db, err := repository.DB(cfg)
 		if err != nil {
+			fmt.Println(err)
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}

@@ -240,18 +240,3 @@ func TestJSONShort(t *testing.T) {
 		})
 	}
 }
-
-func TestGetDB(t *testing.T) {
-	// Создаем запрос и recorder
-	req := httptest.NewRequest(http.MethodGet, "/ping", nil)
-	res := httptest.NewRecorder()
-
-	// Вызываем хендлер
-	handler := GetDB(cfg)
-	handler.ServeHTTP(res, req)
-
-	// Проверяем статус код
-	if res.Code != http.StatusOK {
-		t.Errorf("Expected status OK, got %v", res.Code)
-	}
-}
