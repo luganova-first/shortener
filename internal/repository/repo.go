@@ -87,6 +87,8 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 }
 
 func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
+	defer db.Close()
+
 	rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
 	if err != nil {
 		return s, err
@@ -122,7 +124,6 @@ func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
 		if err != nil {
 			return s, err
 		}
-		defer db.Close()
 		return FillStorageFromDB(context.Background(), db, s)
 	case cfg.StorageFileName != "":
 		return FillStorageFromFile(s, cfg)
@@ -170,6 +171,17 @@ func WriteStorageToFile(s *model.Storage, cfg *config.Config) error {
 
 func DB(cfg *config.Config) (*sql.DB, error) {
 	db, err := sql.Open("pgx", cfg.DBconnStr)
+	if err != nil {
+		return db, err
+	}
+
+	createTableSQL := `
+    CREATE TABLE IF NOT EXISTS shorts (
+        "shorted" VARCHAR(8) NOT NULL DEFAULT '',
+		"full" VARCHAR(250) NOT NULL DEFAULT ''
+    );`
+
+	_, err = db.Exec(createTableSQL)
 	if err != nil {
 		return db, err
 	}
