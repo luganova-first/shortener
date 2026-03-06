@@ -88,25 +88,22 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 
 func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
 	defer db.Close()
-
 	rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
 	if err != nil {
 		return s, err
 	}
-
-	// обязательно закрываем перед возвратом функции
 	defer rows.Close()
 
 	// пробегаем по всем записям
 	for rows.Next() {
 		var shorted string
-		var full string
-		err = rows.Scan(&shorted, &full)
+		var fullURL string
+		err = rows.Scan(&shorted, &fullURL)
 		if err != nil {
 			return s, err
 		}
-		s.Shorted[shorted] = full
-		s.Full[full] = shorted
+		s.Shorted[shorted] = fullURL
+		s.Full[fullURL] = shorted
 	}
 
 	// проверяем на ошибки
@@ -177,8 +174,8 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 
 	createTableSQL := `
     CREATE TABLE IF NOT EXISTS shorts (
-        "shorted" VARCHAR(8) NOT NULL DEFAULT '',
-		"full" VARCHAR(250) NOT NULL DEFAULT ''
+        shorted VARCHAR(8) NOT NULL DEFAULT '',
+		full_url VARCHAR(250) NOT NULL DEFAULT ''
     );`
 
 	_, err = db.Exec(createTableSQL)
@@ -189,8 +186,8 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 	return db, nil
 }
 
-func InsertNewShort(db *sql.DB, shorted string, full string) error {
-	_, err := db.Exec("INSERT INTO shorts (shorted, full) VALUES ($1, $2)", shorted, full)
+func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
+	_, err := db.Exec("INSERT INTO shorts (shorted, full_url) VALUES ($1, $2)", shorted, fullURL)
 	if err != nil {
 		return err
 	}
@@ -208,7 +205,6 @@ func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-
 	for key, value := range s.Shorted {
 		err := InsertNewShort(db, key, value)
 		if err != nil {
