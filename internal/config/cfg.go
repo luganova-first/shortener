@@ -24,7 +24,7 @@ func NewConfig() *Config {
 	// Берём адреса из переменных окружения
 	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
 	cfg.BaseURL = os.Getenv("BASE_URL")
-	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
+	cfg.StorageFileName = os.Getenv("TEMP_FILE")
 	cfg.DBconnStr = os.Getenv("DATABASE_CONN_STRING")
 
 	// Если адресов нет, определяем флаги
