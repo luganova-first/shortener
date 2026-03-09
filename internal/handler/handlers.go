@@ -97,11 +97,14 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		// десериализуем JSON в url
-		if err = json.Unmarshal(buf.Bytes(), &jsonData); err != nil {
+		err = json.Unmarshal(buf.Bytes(), &jsonData)
+		if err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+		defer req.Body.Close()
 
 		targetValue := jsonData.URL
 
@@ -140,7 +143,8 @@ func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// Декодируем JSON из тела запроса
 		var requests []RequestItem
-		if err := json.NewDecoder(req.Body).Decode(&requests); err != nil {
+		err := json.NewDecoder(req.Body).Decode(&requests)
+		if err != nil {
 			res.WriteHeader(http.StatusBadRequest)
 			return
 		}
