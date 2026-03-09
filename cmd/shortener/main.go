@@ -32,6 +32,7 @@ func main() {
 
 	// Передаем базовый URL в хендлер
 	r.Post("/", handler.SetShort(storage, cfg))
+	r.Post("/api/shorten/batch", handler.BatchShort(storage, cfg))
 	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
 	r.Get("/ping", handler.GetDB(cfg))
 	r.Get("/{shortID}", handler.GetShort(storage, cfg))

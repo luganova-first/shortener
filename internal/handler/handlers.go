@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"fmt"
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
@@ -21,6 +21,18 @@ type inputJSONData struct {
 
 type outJSONData struct {
 	Result string `json:"result"`
+}
+
+// RequestItem представляет один элемент запроса
+type RequestItem struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+// ResponseItem представляет один элемент ответа
+type ResponseItem struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
 }
 
 // Хендлер сокращения url
@@ -120,6 +132,55 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		res.Header().Set("content-type", "application/json")
 		res.WriteHeader(http.StatusCreated)
 		res.Write(resp)
+	}
+}
+
+// Хендлер принимающий в теле запроса множество URL для сокращения
+func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		// Декодируем JSON из тела запроса
+		var requests []RequestItem
+		if err := json.NewDecoder(req.Body).Decode(&requests); err != nil {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		defer req.Body.Close()
+
+		// Валидация входных данных
+		if len(requests) == 0 {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// Создаем слайс для ответов
+		responses := make([]ResponseItem, 0, len(requests))
+
+		s := service.NewShortenerService(storage, cfg)
+
+		// Обрабатываем каждый URL
+		for _, item := range requests {
+			// Валидация каждого элемента
+			if item.CorrelationID == "" || item.OriginalURL == "" {
+				continue // Пропускаем некорректные элементы
+			}
+
+			shortURL, err := s.SetData(item.OriginalURL)
+			if err != nil {
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			// Добавляем результат в ответ
+			responses = append(responses, ResponseItem{
+				CorrelationID: item.CorrelationID,
+				ShortURL:      shortURL,
+			})
+		}
+
+		// Отправляем ответ
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusCreated)
+		json.NewEncoder(res).Encode(responses)
 	}
 }
 
