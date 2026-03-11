@@ -26,8 +26,6 @@ func NewShortenerService(storage *model.Storage, cfg *config.Config) *ShortenerS
 
 // SetData сохраняет данные и возвращает сокращенный URL
 func (s *ShortenerService) SetData(targetValue string) (string, error) {
-	baseURL := s.config.BaseURL
-
 	// Ищем body запроса в значениях уже сокращённых
 	cryptoString := s.storage.GetFull(targetValue)
 
@@ -61,7 +59,7 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 		}
 	}
 
-	shortURL, err := url.JoinPath(baseURL, cryptoString)
+	shortURL, err := s.GetShortURL(cryptoString)
 	if err != nil {
 		return "", err
 	}
@@ -72,4 +70,16 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 // GetData получает данные по короткому идентификатору
 func (s *ShortenerService) GetData(shortID string) string {
 	return s.storage.GetShort(shortID)
+}
+
+// GetData получает данные по короткому идентификатору
+func (s *ShortenerService) GetShortURL(short string) (string, error) {
+	baseURL := s.config.BaseURL
+
+	shortURL, err := url.JoinPath(baseURL, short)
+	if err != nil {
+		return "", err
+	}
+
+	return shortURL, nil
 }

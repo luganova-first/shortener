@@ -66,14 +66,25 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		s := service.NewShortenerService(storage, cfg)
 
+		res.Header().Set("content-type", "text/plain")
+
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			return
+			if err == fmt.Errorf("already exists") {
+				shortURL, err = s.GetShortURL(storage.GetFull(targetValue))
+				if err != nil {
+					res.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				res.WriteHeader(http.StatusConflict)
+			} else {
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			res.WriteHeader(http.StatusCreated)
 		}
 
-		res.Header().Set("content-type", "text/plain")
-		res.WriteHeader(http.StatusCreated)
 		res.Write([]byte(shortURL))
 	}
 }
@@ -116,10 +127,23 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		s := service.NewShortenerService(storage, cfg)
 
+		res.Header().Set("content-type", "application/json")
+
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			return
+			if err == fmt.Errorf("already exists") {
+				shortURL, err = s.GetShortURL(storage.GetFull(targetValue))
+				if err != nil {
+					res.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				res.WriteHeader(http.StatusConflict)
+			} else {
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			res.WriteHeader(http.StatusCreated)
 		}
 
 		resultData := outJSONData{
@@ -132,8 +156,6 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
-		res.Header().Set("content-type", "application/json")
-		res.WriteHeader(http.StatusCreated)
 		res.Write(resp)
 	}
 }

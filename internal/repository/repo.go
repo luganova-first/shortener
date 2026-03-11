@@ -4,6 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"github.com/jackc/pgerrcode"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
@@ -183,12 +187,24 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 		return db, err
 	}
 
+	createIndex := `CREATE UNIQUE INDEX idx_shorts_full_url_unique ON shorts (full_url);`
+	_, err = db.Exec(createIndex)
+	if err != nil {
+		return db, err
+	}
+
 	return db, nil
 }
 
 func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
 	_, err := db.Exec("INSERT INTO shorts (shorted, full_url) VALUES ($1, $2)", shorted, fullURL)
 	if err != nil {
+		// Проверяем, является ли ошибка нарушением уникальности
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
+			// Нарушение уникальности - такой URL уже существует
+			return fmt.Errorf("already exists")
+		}
 		return err
 	}
 	return nil
