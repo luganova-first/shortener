@@ -45,11 +45,6 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 				s.storage.Shorted[cryptoString] = targetValue
 				s.storage.Full[targetValue] = cryptoString
 
-				// Сохраняем Storage
-				if err := repository.SaveStorage(s.storage, s.config); err != nil {
-					return "", err
-				}
-
 				break
 			}
 		}
@@ -62,6 +57,12 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 	shortURL, err := s.GetShortURL(cryptoString)
 	if err != nil {
 		return "", err
+	}
+
+	// Сохраняем Storage
+	err = repository.SaveStorage(s.storage, s.config, cryptoString, targetValue)
+	if err != nil {
+		return shortURL, err
 	}
 
 	return shortURL, nil

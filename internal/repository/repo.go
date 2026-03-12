@@ -210,31 +210,25 @@ func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
 	return nil
 }
 
-func WriteStorageToDB(s *model.Storage, cfg *config.Config) error {
+func WriteStorageToDB(cfg *config.Config, key string, value string) error {
 	db, err := DB(cfg)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
 
-	_, err = db.Exec("TRUNCATE TABLE shorts")
+	err = InsertNewShort(db, key, value)
 	if err != nil {
 		return err
-	}
-	for key, value := range s.Shorted {
-		err := InsertNewShort(db, key, value)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func SaveStorage(s *model.Storage, cfg *config.Config) error {
+func SaveStorage(s *model.Storage, cfg *config.Config, key string, value string) error {
 	switch {
 	case cfg.DBconnStr != "":
-		return WriteStorageToDB(s, cfg)
+		return WriteStorageToDB(cfg, key, value)
 	case cfg.StorageFileName != "":
 		return WriteStorageToFile(s, cfg)
 	}

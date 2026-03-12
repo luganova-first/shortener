@@ -70,12 +70,7 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			if err == fmt.Errorf("already exists") {
-				shortURL, err = s.GetShortURL(storage.GetFull(targetValue))
-				if err != nil {
-					res.WriteHeader(http.StatusInternalServerError)
-					return
-				}
+			if err.Error() == "already exists" {
 				res.WriteHeader(http.StatusConflict)
 			} else {
 				res.WriteHeader(http.StatusInternalServerError)
@@ -131,12 +126,7 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			if err == fmt.Errorf("already exists") {
-				shortURL, err = s.GetShortURL(storage.GetFull(targetValue))
-				if err != nil {
-					res.WriteHeader(http.StatusInternalServerError)
-					return
-				}
+			if err.Error() == "already exists" {
 				res.WriteHeader(http.StatusConflict)
 			} else {
 				res.WriteHeader(http.StatusInternalServerError)
