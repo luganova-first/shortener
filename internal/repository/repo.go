@@ -187,7 +187,7 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 		return db, err
 	}
 
-	createIndex := `CREATE UNIQUE INDEX idx_shorts_full_url_unique ON shorts (full_url);`
+	createIndex := `CREATE UNIQUE INDEX IF NOT EXISTS idx_shorts_full_url_unique ON shorts (full_url);`
 	_, err = db.Exec(createIndex)
 	if err != nil {
 		return db, err
