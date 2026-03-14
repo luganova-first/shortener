@@ -24,8 +24,8 @@ func NewShortenerService(storage *model.Storage, cfg *config.Config) *ShortenerS
 	}
 }
 
-// SetData сохраняет данные и возвращает сокращенный URL
-func (s *ShortenerService) SetData(targetValue string) (string, error) {
+// MakeShort создаёт новое сокращение и записывает в мапу
+func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
 	// Ищем body запроса в значениях уже сокращённых
 	cryptoString := s.storage.GetFull(targetValue)
 
@@ -54,18 +54,50 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 		}
 	}
 
-	shortURL, err := s.GetShortURL(cryptoString)
+	return cryptoString, nil
+}
+
+// SetData сохраняет данные и возвращает сокращенный URL
+func (s *ShortenerService) SetData(targetValue string) (string, error) {
+	short, err := s.MakeShort(targetValue)
+
+	shortURL, err := s.GetShortURL(short)
 	if err != nil {
 		return "", err
 	}
 
-	// Сохраняем Storage
-	err = repository.SaveStorage(s.storage, s.config, cryptoString, targetValue)
-	if err != nil {
-		return shortURL, err
+	switch {
+	case s.config.DBconnStr != "":
+		err = repository.WriteStorageToDB(s.config, short, shortURL)
+		if err != nil {
+			return shortURL, err
+		}
+	case s.config.StorageFileName != "":
+		err = repository.WriteStorageToFile(s.storage, s.config)
+		if err != nil {
+			return shortURL, err
+		}
 	}
 
 	return shortURL, nil
+}
+
+// SetBulkData сохраняет множественные данные
+func (s *ShortenerService) SetBulkData(data map[string]string) error {
+	switch {
+	case s.config.DBconnStr != "":
+		err := repository.WriteBulkStorageToDB(s.config, data)
+		if err != nil {
+			return err
+		}
+	case s.config.StorageFileName != "":
+		err := repository.WriteStorageToFile(s.storage, s.config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // GetData получает данные по короткому идентификатору

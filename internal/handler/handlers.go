@@ -3,12 +3,13 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
+	"errors"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
 	"github.com/luganova-first/shortener/internal/service"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -70,9 +71,10 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			if err.Error() == "already exists" {
+			if errors.Is(err, repository.ErrAlreadyExists) {
 				res.WriteHeader(http.StatusConflict)
 			} else {
+				log.Println(err)
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -126,9 +128,10 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			if err.Error() == "already exists" {
+			if errors.Is(err, repository.ErrAlreadyExists) {
 				res.WriteHeader(http.StatusConflict)
 			} else {
+				log.Println(err)
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -142,6 +145,7 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		resp, err := json.MarshalIndent(resultData, "", " ")
 		if err != nil {
+			log.Println(err)
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
@@ -168,10 +172,16 @@ func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		// Создаём мапу данных для сохранения
+		dataForSave := make(map[string]string)
+
 		// Создаем слайс для ответов
 		responses := make([]ResponseItem, 0, len(requests))
 
 		s := service.NewShortenerService(storage, cfg)
+
+		// Ключ сокращения
+		var short string
 
 		// Обрабатываем каждый URL
 		for _, item := range requests {
@@ -180,8 +190,11 @@ func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 				continue // Пропускаем некорректные элементы
 			}
 
-			shortURL, err := s.SetData(item.OriginalURL)
+			short, err = s.MakeShort(item.OriginalURL)
+
+			shortURL, err := s.GetShortURL(short)
 			if err != nil {
+				log.Println(err)
 				res.WriteHeader(http.StatusInternalServerError)
 				return
 			}
@@ -191,6 +204,16 @@ func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 				CorrelationID: item.CorrelationID,
 				ShortURL:      shortURL,
 			})
+
+			// Добавляем результат в данные для сохранения
+			dataForSave[short] = item.OriginalURL
+		}
+
+		err = s.SetBulkData(dataForSave)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
 		}
 
 		// Отправляем ответ
@@ -225,7 +248,7 @@ func GetDB(cfg *config.Config) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		db, err := repository.DB(cfg)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}

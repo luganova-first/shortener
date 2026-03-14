@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,9 +12,11 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/pressly/goose/v3"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // Формат данных в файле
@@ -47,6 +50,10 @@ type FileReader struct {
 	file *os.File
 }
 
+var ErrAlreadyExists = errors.New("url already exists")
+
+var embedMigrations embed.FS
+
 func NewFileReader(filename string) (*FileReader, error) {
 	file, err := os.OpenFile(filename, os.O_RDONLY|os.O_CREATE, 0666)
 	if err != nil {
@@ -67,7 +74,7 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 
 	fileReader, err := NewFileReader(storageFileName)
 	if err != nil {
-		return s, err
+		return s, fmt.Errorf("failed to read file with shorts: %w", err)
 	}
 	defer fileReader.Close()
 
@@ -79,7 +86,7 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 	// Чтение и парсинг JSON
 	err = decoder.Decode(&storageRows)
 	if err != nil && err != io.EOF {
-		return s, err
+		return s, fmt.Errorf("failed to read file with shorts: %w", err)
 	}
 
 	for _, row := range storageRows {
@@ -92,9 +99,14 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 
 func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
 	defer db.Close()
+
+	if err := goose.Up(db, "./migrations"); err != nil {
+		return s, fmt.Errorf("failed up migrations: %w", err)
+	}
+
 	rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
 	if err != nil {
-		return s, err
+		return s, fmt.Errorf("failed to read the shorts table: %w", err)
 	}
 	defer rows.Close()
 
@@ -104,7 +116,7 @@ func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*mode
 		var fullURL string
 		err = rows.Scan(&shorted, &fullURL)
 		if err != nil {
-			return s, err
+			return s, fmt.Errorf("failed to read the shorts table: %w", err)
 		}
 		s.Shorted[shorted] = fullURL
 		s.Full[fullURL] = shorted
@@ -113,7 +125,7 @@ func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*mode
 	// проверяем на ошибки
 	err = rows.Err()
 	if err != nil {
-		return s, err
+		return s, fmt.Errorf("failed to read the shorts table: %w", err)
 	}
 	return s, nil
 }
@@ -123,8 +135,9 @@ func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
 	case cfg.DBconnStr != "":
 		db, err := DB(cfg)
 		if err != nil {
-			return s, err
+			return s, fmt.Errorf("failed conn to DB: %w", err)
 		}
+
 		return FillStorageFromDB(context.Background(), db, s)
 	case cfg.StorageFileName != "":
 		return FillStorageFromFile(s, cfg)
@@ -176,34 +189,17 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 		return db, err
 	}
 
-	createTableSQL := `
-    CREATE TABLE IF NOT EXISTS shorts (
-        shorted VARCHAR(8) NOT NULL DEFAULT '',
-		full_url VARCHAR(250) NOT NULL DEFAULT ''
-    );`
-
-	_, err = db.Exec(createTableSQL)
-	if err != nil {
-		return db, err
-	}
-
-	createIndex := `CREATE UNIQUE INDEX IF NOT EXISTS idx_shorts_full_url_unique ON shorts (full_url);`
-	_, err = db.Exec(createIndex)
-	if err != nil {
-		return db, err
-	}
-
 	return db, nil
 }
 
 func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
-	_, err := db.Exec("INSERT INTO shorts (shorted, full_url) VALUES ($1, $2)", shorted, fullURL)
+	_, err := db.Exec("INSERT INTO shorts (id, shorted, full_url) VALUES (DEFAULT, $1, $2)", shorted, fullURL)
 	if err != nil {
 		// Проверяем, является ли ошибка нарушением уникальности
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
 			// Нарушение уникальности - такой URL уже существует
-			return fmt.Errorf("already exists")
+			return fmt.Errorf("%w: %s", ErrAlreadyExists, fullURL)
 		}
 		return err
 	}
@@ -225,13 +221,28 @@ func WriteStorageToDB(cfg *config.Config, key string, value string) error {
 	return nil
 }
 
-func SaveStorage(s *model.Storage, cfg *config.Config, key string, value string) error {
-	switch {
-	case cfg.DBconnStr != "":
-		return WriteStorageToDB(cfg, key, value)
-	case cfg.StorageFileName != "":
-		return WriteStorageToFile(s, cfg)
+func WriteBulkStorageToDB(cfg *config.Config, data map[string]string) error {
+	db, err := DB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	// Создаем слайс для значений и аргументов
+	valueStrings := make([]string, 0, len(data))
+	valueArgs := make([]interface{}, 0, len(data)*2)
+
+	i := 0
+	for key, value := range data {
+		valueStrings = append(valueStrings, fmt.Sprintf("(DEFAULT, $%d, $%d)",
+			i*2+1, i*2+2))
+		valueArgs = append(valueArgs, key, value)
+		i++
 	}
 
-	return nil
+	query := fmt.Sprintf("INSERT INTO shorts (id, shorted, full_url) VALUES %s", strings.Join(valueStrings, ","))
+
+	_, err = db.Exec(query, valueArgs...)
+
+	return err
 }

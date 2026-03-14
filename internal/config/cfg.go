@@ -22,11 +22,13 @@ func NewConfig() *Config {
 	defaultServerAddr := "localhost:8080"
 	defaultStorageFileName := "Storage.txt"
 
+	var existsDBconnStr bool
+
 	// Берём адреса из переменных окружения
 	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
 	cfg.BaseURL = os.Getenv("BASE_URL")
 	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
-	cfg.DBconnStr = os.Getenv("DATABASE_DSN")
+	cfg.DBconnStr, existsDBconnStr = os.LookupEnv("DATABASE_DSN")
 
 	// Если адресов нет, определяем флаги
 	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" || cfg.DBconnStr == "" {
@@ -69,7 +71,7 @@ func NewConfig() *Config {
 			cfg.StorageFileName = *fileName
 		}
 
-		if cfg.DBconnStr == "" {
+		if existsDBconnStr == false {
 			// Устанавливаем значения
 			cfg.DBconnStr = *dbStr
 		}

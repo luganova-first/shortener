@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "fmt"
 	"github.com/luganova-first/shortener/internal/archiver"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
