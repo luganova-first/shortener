@@ -68,7 +68,7 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 
 	switch {
 	case s.config.DBconnStr != "":
-		err = repository.WriteStorageToDB(s.config, short, shortURL)
+		err = repository.WriteStorageToDB(s.config, short, targetValue)
 		if err != nil {
 			return shortURL, err
 		}

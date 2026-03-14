@@ -203,6 +203,7 @@ func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
 		}
 		return err
 	}
+
 	return nil
 }
 
