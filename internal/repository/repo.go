@@ -112,9 +112,10 @@ func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*mode
 
 	// пробегаем по всем записям
 	for rows.Next() {
+		var id int
 		var shorted string
 		var fullURL string
-		err = rows.Scan(&shorted, &fullURL)
+		err = rows.Scan(&id, &shorted, &fullURL)
 		if err != nil {
 			return s, fmt.Errorf("failed to read the shorts table: %w", err)
 		}
