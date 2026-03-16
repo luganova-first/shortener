@@ -138,42 +138,30 @@ func GetFullFromDB(cfg *config.Config, targetValue string) string {
 	return shorted
 }
 
-func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
+func UpDBMigrations(db *sql.DB) error {
+	if err := goose.Up(db, "./migrations"); err != nil {
+		return fmt.Errorf("failed up migrations: %w", err)
+	}
 	defer db.Close()
 
-	if err := goose.Up(db, "./migrations"); err != nil {
-		return s, fmt.Errorf("failed up migrations: %w", err)
-	}
-
-	rows, err := db.QueryContext(ctx, "SELECT * FROM shorts")
-	if err != nil {
-		return s, fmt.Errorf("failed to read the shorts table: %w", err)
-	}
-	defer rows.Close()
-
-	// пробегаем по всем записям
-	for rows.Next() {
-		var id int
-		var shorted string
-		var fullURL string
-		err = rows.Scan(&id, &shorted, &fullURL)
-		if err != nil {
-			return s, fmt.Errorf("failed to read the shorts table: %w", err)
-		}
-		s.Shorted[shorted] = fullURL
-		s.Full[fullURL] = shorted
-	}
-
-	// проверяем на ошибки
-	err = rows.Err()
-	if err != nil {
-		return s, fmt.Errorf("failed to read the shorts table: %w", err)
-	}
-	return s, nil
+	return nil
 }
 
 func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
-	if cfg.StorageFileName != "" {
+	switch {
+	case cfg.DBconnStr != "":
+		db, err := DB(cfg)
+		if err != nil {
+			return s, err
+		}
+
+		err = UpDBMigrations(db)
+		if err != nil {
+			return s, err
+		}
+
+		return s, nil
+	case cfg.StorageFileName != "":
 		return FillStorageFromFile(s, cfg)
 	}
 
