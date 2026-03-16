@@ -14,6 +14,7 @@ import (
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/pressly/goose/v3"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -97,6 +98,46 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 	return s, nil
 }
 
+func GetShortFromDB(cfg *config.Config, shortID string) string {
+	db, err := DB(cfg)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	defer db.Close()
+
+	row := db.QueryRowContext(context.Background(), "SELECT full_url FROM shorts WHERE shorted = $1", shortID)
+
+	var fullURL string
+	err = row.Scan(&fullURL)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+
+	return fullURL
+}
+
+func GetFullFromDB(cfg *config.Config, targetValue string) string {
+	db, err := DB(cfg)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+	defer db.Close()
+
+	row := db.QueryRowContext(context.Background(), "SELECT shorted FROM shorts WHERE full_url = $1", targetValue)
+
+	var shorted string
+	err = row.Scan(&shorted)
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+
+	return shorted
+}
+
 func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*model.Storage, error) {
 	defer db.Close()
 
@@ -132,15 +173,7 @@ func FillStorageFromDB(ctx context.Context, db *sql.DB, s *model.Storage) (*mode
 }
 
 func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
-	switch {
-	case cfg.DBconnStr != "":
-		db, err := DB(cfg)
-		if err != nil {
-			return s, fmt.Errorf("failed conn to DB: %w", err)
-		}
-
-		return FillStorageFromDB(context.Background(), db, s)
-	case cfg.StorageFileName != "":
+	if cfg.StorageFileName != "" {
 		return FillStorageFromFile(s, cfg)
 	}
 

@@ -26,8 +26,14 @@ func NewShortenerService(storage *model.Storage, cfg *config.Config) *ShortenerS
 
 // MakeShort создаёт новое сокращение и записывает в мапу
 func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
+	var cryptoString string
+
 	// Ищем body запроса в значениях уже сокращённых
-	cryptoString := s.storage.GetFull(targetValue)
+	if s.config.DBconnStr != "" {
+		cryptoString = repository.GetFullFromDB(s.config, targetValue)
+	} else {
+		cryptoString = s.storage.GetFull(targetValue)
+	}
 
 	if cryptoString == "" {
 		// Если не нашли, генерируем новое сокращение и записываем его в Shorted и в Full
@@ -102,7 +108,11 @@ func (s *ShortenerService) SetBulkData(data map[string]string) error {
 
 // GetData получает данные по короткому идентификатору
 func (s *ShortenerService) GetData(shortID string) string {
-	return s.storage.GetShort(shortID)
+	if s.config.DBconnStr != "" {
+		return repository.GetShortFromDB(s.config, shortID)
+	} else {
+		return s.storage.GetShort(shortID)
+	}
 }
 
 // GetData получает данные по короткому идентификатору
