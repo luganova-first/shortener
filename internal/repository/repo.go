@@ -194,7 +194,7 @@ func DB(cfg *config.Config) (*sql.DB, error) {
 }
 
 func InsertNewShort(db *sql.DB, shorted string, fullURL string) error {
-	_, err := db.Exec("INSERT INTO shorts (id, shorted, full_url) VALUES (DEFAULT, $1, $2)", shorted, fullURL)
+	_, err := db.Exec("INSERT INTO shorts (shorted, full_url) VALUES ($1, $2)", shorted, fullURL)
 	if err != nil {
 		// Проверяем, является ли ошибка нарушением уникальности
 		var pgErr *pgconn.PgError
@@ -236,13 +236,13 @@ func WriteBulkStorageToDB(cfg *config.Config, data map[string]string) error {
 
 	i := 0
 	for key, value := range data {
-		valueStrings = append(valueStrings, fmt.Sprintf("(DEFAULT, $%d, $%d)",
+		valueStrings = append(valueStrings, fmt.Sprintf("($%d, $%d)",
 			i*2+1, i*2+2))
 		valueArgs = append(valueArgs, key, value)
 		i++
 	}
 
-	query := fmt.Sprintf("INSERT INTO shorts (id, shorted, full_url) VALUES %s", strings.Join(valueStrings, ","))
+	query := fmt.Sprintf("INSERT INTO shorts (shorted, full_url) VALUES %s", strings.Join(valueStrings, ","))
 
 	_, err = db.Exec(query, valueArgs...)
 
