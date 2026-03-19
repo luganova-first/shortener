@@ -2,6 +2,8 @@ module github.com/luganova-first/shortener
 
 go 1.26
 
+require github.com/golang-jwt/jwt/v4 v4.5.2
+
 require (
 	github.com/caarlos0/env/v6 v6.10.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

@@ -8,10 +8,12 @@ import (
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
 	"github.com/luganova-first/shortener/internal/service"
+	"github.com/luganova-first/shortener/internal/userauth"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -34,6 +36,12 @@ type RequestItem struct {
 type ResponseItem struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
+}
+
+// UserItem представляет один элемент ответа
+type UserItem struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }
 
 // Хендлер сокращения url
@@ -240,6 +248,78 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		res.Header().Set("Location", fullURL)
 		res.WriteHeader(http.StatusTemporaryRedirect)
 		res.Write([]byte(fullURL))
+	}
+}
+
+// Хендлер получения всех сокращений пользователя
+func UserURLS(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		var tokenString string
+
+		cookie, err := req.Cookie("jwt")
+		if err != nil {
+			if err == http.ErrNoCookie {
+				tokenString, err = userauth.BuildJWTString()
+				if err != nil {
+					log.Println(err)
+					res.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				cookie := &http.Cookie{
+					Name:     "jwt",
+					Value:    tokenString,
+					Path:     "/api/user/urls",
+					Expires:  time.Now().Add(24 * time.Hour),
+					HttpOnly: true,
+					SameSite: http.SameSiteStrictMode,
+				}
+
+				http.SetCookie(res, cookie)
+			} else {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			tokenString = cookie.Value
+		}
+
+		s := service.NewShortenerService(storage, cfg)
+
+		userID := userauth.GetUserID(tokenString)
+		if userID != 17 {
+			res.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if len(storage.Shorted) == 0 {
+			res.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Создаем слайс для ответов
+		responses := make([]UserItem, 0, len(storage.Shorted))
+
+		for short, originalURL := range storage.Shorted {
+			shortURL, err := s.GetShortURL(short)
+			if err != nil {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			// Добавляем результат в ответ
+			responses = append(responses, UserItem{
+				ShortURL:      shortURL,
+				OriginalURL:   originalURL,
+			})
+		}
+
+		// Отправляем ответ
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
+		json.NewEncoder(res).Encode(responses)
 	}
 }
 
