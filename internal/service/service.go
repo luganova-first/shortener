@@ -24,12 +24,16 @@ func NewShortenerService(storage *model.Storage, cfg *config.Config) *ShortenerS
 	}
 }
 
-// SetData сохраняет данные и возвращает сокращенный URL
-func (s *ShortenerService) SetData(targetValue string) (string, error) {
-	baseURL := s.config.BaseURL
+// MakeShort создаёт новое сокращение и записывает в мапу
+func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
+	var cryptoString string
 
 	// Ищем body запроса в значениях уже сокращённых
-	cryptoString := s.storage.GetFull(targetValue)
+	if s.config.DBconnStr != "" {
+		cryptoString = repository.GetFullFromDB(s.config, targetValue)
+	} else {
+		cryptoString = s.storage.GetFull(targetValue)
+	}
 
 	if cryptoString == "" {
 		// Если не нашли, генерируем новое сокращение и записываем его в Shorted и в Full
@@ -47,11 +51,6 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 				s.storage.Shorted[cryptoString] = targetValue
 				s.storage.Full[targetValue] = cryptoString
 
-				// Перезаписываем файл с данными Storage
-				if err := repository.WriteStorageToFile(s.storage, s.config); err != nil {
-					return "", err
-				}
-
 				break
 			}
 		}
@@ -61,15 +60,69 @@ func (s *ShortenerService) SetData(targetValue string) (string, error) {
 		}
 	}
 
-	shortURL, err := url.JoinPath(baseURL, cryptoString)
+	return cryptoString, nil
+}
+
+// SetData сохраняет данные и возвращает сокращенный URL
+func (s *ShortenerService) SetData(targetValue string) (string, error) {
+	short, err := s.MakeShort(targetValue)
+
+	shortURL, err := s.GetShortURL(short)
 	if err != nil {
 		return "", err
+	}
+
+	switch {
+	case s.config.DBconnStr != "":
+		err = repository.WriteStorageToDB(s.config, short, targetValue)
+		if err != nil {
+			return shortURL, err
+		}
+	case s.config.StorageFileName != "":
+		err = repository.WriteStorageToFile(s.storage, s.config)
+		if err != nil {
+			return shortURL, err
+		}
 	}
 
 	return shortURL, nil
 }
 
+// SetBulkData сохраняет множественные данные
+func (s *ShortenerService) SetBulkData(data map[string]string) error {
+	switch {
+	case s.config.DBconnStr != "":
+		err := repository.WriteBulkStorageToDB(s.config, data)
+		if err != nil {
+			return err
+		}
+	case s.config.StorageFileName != "":
+		err := repository.WriteStorageToFile(s.storage, s.config)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // GetData получает данные по короткому идентификатору
 func (s *ShortenerService) GetData(shortID string) string {
-	return s.storage.GetShort(shortID)
+	if s.config.DBconnStr != "" {
+		return repository.GetShortFromDB(s.config, shortID)
+	} else {
+		return s.storage.GetShort(shortID)
+	}
+}
+
+// GetData получает данные по короткому идентификатору
+func (s *ShortenerService) GetShortURL(short string) (string, error) {
+	baseURL := s.config.BaseURL
+
+	shortURL, err := url.JoinPath(baseURL, short)
+	if err != nil {
+		return "", err
+	}
+
+	return shortURL, nil
 }

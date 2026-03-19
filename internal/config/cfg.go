@@ -12,6 +12,7 @@ type Config struct {
 	ServerAddress   string // Адрес запуска HTTP-сервера
 	BaseURL         string // Базовый адрес для сокращенных URL
 	StorageFileName string // Имя файла для записи данных Storage
+	DBconnStr       string // Строка с адресом подключения к БД
 }
 
 // NewConfig создает и инициализирует конфигурацию из аргументов командной строки
@@ -21,50 +22,61 @@ func NewConfig() *Config {
 	defaultServerAddr := "localhost:8080"
 	defaultStorageFileName := "Storage.txt"
 
-	// Берём адреса из переменных окружения
-	cfg.ServerAddress = os.Getenv("SERVER_ADDRESS")
-	cfg.BaseURL = os.Getenv("BASE_URL")
-	cfg.StorageFileName = os.Getenv("FILE_STORAGE_PATH")
+	// Парсим флаги
+	serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
+	baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
+	fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
+	dbStr := flag.String("d", "", "Строка с адресом подключения к БД")
+	flag.Parse()
 
-	// Если адресов нет, определяем флаги
-	if cfg.ServerAddress == "" || cfg.BaseURL == "" || cfg.StorageFileName == "" {
-		serverAddr := flag.String("a", defaultServerAddr, "Адрес запуска HTTP-сервера")
-		baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
-		fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
-		flag.Parse()
+	var ok bool
 
-		if cfg.ServerAddress == "" {
-			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
-			if *serverAddr == "" {
-				*serverAddr = defaultServerAddr
-			}
-
-			// Устанавливаем значения
-			cfg.ServerAddress = *serverAddr
+	// Берём адрес из переменной окружения
+	cfg.ServerAddress, ok = os.LookupEnv("SERVER_ADDRESS")
+	if !ok {
+		// Если адреса нет, определяем флаги
+		if *serverAddr == "" {
+			*serverAddr = defaultServerAddr
 		}
 
-		if cfg.BaseURL == "" {
-			// Если базовый URL никак не указан, формируем его из адреса сервера
-			if *baseURL == "" {
-				// Добавляем http:// если его нет в адресе сервера
-				if !strings.HasPrefix(cfg.ServerAddress, "http://") && !strings.HasPrefix(cfg.ServerAddress, "https://") {
-					*baseURL = "http://" + cfg.ServerAddress
-				} else {
-					*baseURL = cfg.ServerAddress
-				}
+		// Устанавливаем значение
+		cfg.ServerAddress = *serverAddr
+	}
+
+	// Берём адрес из переменной окружения
+	cfg.BaseURL, ok = os.LookupEnv("BASE_URL")
+	if !ok {
+		// Если адреса нет, определяем флаги
+		if *baseURL == "" {
+			// Добавляем http:// если его нет в адресе сервера
+			if !strings.HasPrefix(cfg.ServerAddress, "http://") && !strings.HasPrefix(cfg.ServerAddress, "https://") {
+				*baseURL = "http://" + cfg.ServerAddress
+			} else {
+				*baseURL = cfg.ServerAddress
 			}
-			cfg.BaseURL = *baseURL
 		}
 
-		if cfg.StorageFileName == "" {
-			// Если адрес запуска HTTP-сервера никак не указан, ставим по умолчанию
-			if *fileName == "" {
-				*fileName = defaultStorageFileName
-			}
+		// Устанавливаем значение
+		cfg.BaseURL = *baseURL
+	}
 
-			// Устанавливаем значения
-			cfg.StorageFileName = *fileName
+	// Берём имя файла из переменной окружения
+	cfg.StorageFileName, ok = os.LookupEnv("FILE_STORAGE_PATH")
+	if !ok {
+		// Если имени файла нет, определяем флаги
+		if *fileName == "" {
+			*fileName = defaultStorageFileName
 		}
+
+		// Устанавливаем значения
+		cfg.StorageFileName = *fileName
+	}
+
+	// Берём настройки БД из переменной окружения
+	cfg.DBconnStr, ok = os.LookupEnv("DATABASE_DSN")
+	if !ok {
+		// Берём настроейк БД нет, определяем флаги
+		cfg.DBconnStr = *dbStr
 	}
 
 	return cfg

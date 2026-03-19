@@ -240,3 +240,54 @@ func TestJSONShort(t *testing.T) {
 		})
 	}
 }
+
+func TestBatchShort_Success(t *testing.T) {
+	handler := BatchShort(storage, cfg)
+
+	// Тестовые данные
+	requests := []RequestItem{
+		{
+			CorrelationID: "123",
+			OriginalURL:   "https://example.com/very/long/url/1",
+		},
+		{
+			CorrelationID: "456",
+			OriginalURL:   "https://example.com/very/long/url/2",
+		},
+		{
+			CorrelationID: "789",
+			OriginalURL:   "https://example.com/very/long/url/3",
+		},
+	}
+
+	body, err := json.Marshal(requests)
+	require.NoError(t, err)
+
+	// Создаем запрос
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Создаем ResponseRecorder
+	w := httptest.NewRecorder()
+
+	// Выполняем запрос
+	handler.ServeHTTP(w, req)
+
+	// Проверяем результат
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
+
+	// Декодируем ответ
+	var responses []ResponseItem
+	err = json.NewDecoder(w.Body).Decode(&responses)
+	require.NoError(t, err)
+
+	// Проверяем количество ответов
+	assert.Len(t, responses, len(requests))
+
+	// Проверяем соответствие correlation_id
+	for i, resp := range responses {
+		assert.Equal(t, requests[i].CorrelationID, resp.CorrelationID)
+		assert.NotEmpty(t, resp.ShortURL)
+	}
+}

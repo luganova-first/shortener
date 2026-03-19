@@ -3,10 +3,13 @@ package handler
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/repository"
 	"github.com/luganova-first/shortener/internal/service"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 
@@ -19,6 +22,18 @@ type inputJSONData struct {
 
 type outJSONData struct {
 	Result string `json:"result"`
+}
+
+// RequestItem представляет один элемент запроса
+type RequestItem struct {
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
+// ResponseItem представляет один элемент ответа
+type ResponseItem struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
 }
 
 // Хендлер сокращения url
@@ -52,14 +67,21 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		s := service.NewShortenerService(storage, cfg)
 
+		res.Header().Set("content-type", "text/plain")
+
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			return
+			if errors.Is(err, repository.ErrAlreadyExists) {
+				res.WriteHeader(http.StatusConflict)
+			} else {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			res.WriteHeader(http.StatusCreated)
 		}
 
-		res.Header().Set("content-type", "text/plain")
-		res.WriteHeader(http.StatusCreated)
 		res.Write([]byte(shortURL))
 	}
 }
@@ -83,11 +105,14 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+
 		// десериализуем JSON в url
-		if err = json.Unmarshal(buf.Bytes(), &jsonData); err != nil {
+		err = json.Unmarshal(buf.Bytes(), &jsonData)
+		if err != nil {
 			http.Error(res, err.Error(), http.StatusBadRequest)
 			return
 		}
+		defer req.Body.Close()
 
 		targetValue := jsonData.URL
 
@@ -99,10 +124,19 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		s := service.NewShortenerService(storage, cfg)
 
+		res.Header().Set("content-type", "application/json")
+
 		shortURL, err := s.SetData(targetValue)
 		if err != nil {
-			res.WriteHeader(http.StatusInternalServerError)
-			return
+			if errors.Is(err, repository.ErrAlreadyExists) {
+				res.WriteHeader(http.StatusConflict)
+			} else {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		} else {
+			res.WriteHeader(http.StatusCreated)
 		}
 
 		resultData := outJSONData{
@@ -111,13 +145,81 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 
 		resp, err := json.MarshalIndent(resultData, "", " ")
 		if err != nil {
+			log.Println(err)
 			res.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		res.Header().Set("content-type", "application/json")
-		res.WriteHeader(http.StatusCreated)
 		res.Write(resp)
+	}
+}
+
+// Хендлер принимающий в теле запроса множество URL для сокращения
+func BatchShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		// Декодируем JSON из тела запроса
+		var requests []RequestItem
+		err := json.NewDecoder(req.Body).Decode(&requests)
+		if err != nil {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		defer req.Body.Close()
+
+		// Валидация входных данных
+		if len(requests) == 0 {
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		// Создаём мапу данных для сохранения
+		dataForSave := make(map[string]string)
+
+		// Создаем слайс для ответов
+		responses := make([]ResponseItem, 0, len(requests))
+
+		s := service.NewShortenerService(storage, cfg)
+
+		// Ключ сокращения
+		var short string
+
+		// Обрабатываем каждый URL
+		for _, item := range requests {
+			// Валидация каждого элемента
+			if item.CorrelationID == "" || item.OriginalURL == "" {
+				continue // Пропускаем некорректные элементы
+			}
+
+			short, err = s.MakeShort(item.OriginalURL)
+
+			shortURL, err := s.GetShortURL(short)
+			if err != nil {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			// Добавляем результат в ответ
+			responses = append(responses, ResponseItem{
+				CorrelationID: item.CorrelationID,
+				ShortURL:      shortURL,
+			})
+
+			// Добавляем результат в данные для сохранения
+			dataForSave[short] = item.OriginalURL
+		}
+
+		err = s.SetBulkData(dataForSave)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// Отправляем ответ
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusCreated)
+		json.NewEncoder(res).Encode(responses)
 	}
 }
 
@@ -138,5 +240,20 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		res.Header().Set("Location", fullURL)
 		res.WriteHeader(http.StatusTemporaryRedirect)
 		res.Write([]byte(fullURL))
+	}
+}
+
+// Хендлер получения подключения к базе данных
+func GetDB(cfg *config.Config) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		db, err := repository.DB(cfg)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		defer db.Close()
+
+		res.WriteHeader(http.StatusOK)
 	}
 }

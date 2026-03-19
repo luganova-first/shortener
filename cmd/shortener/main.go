@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "fmt"
 	"github.com/luganova-first/shortener/internal/archiver"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/handler"
@@ -23,7 +22,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	storage, err := repository.FillStorageFromFile(model.NewStorage(), cfg)
+	storage, err := repository.FillStorage(model.NewStorage(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,7 +31,9 @@ func main() {
 
 	// Передаем базовый URL в хендлер
 	r.Post("/", handler.SetShort(storage, cfg))
+	r.Post("/api/shorten/batch", handler.BatchShort(storage, cfg))
 	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
+	r.Get("/ping", handler.GetDB(cfg))
 	r.Get("/{shortID}", handler.GetShort(storage, cfg))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
