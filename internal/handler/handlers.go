@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -259,6 +260,30 @@ func UserURLS(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		cookie, err := req.Cookie("jwt")
 		if err != nil {
 			if err == http.ErrNoCookie {
+				// Очистим "чужие" сокращения из памяти
+				clear(storage.Shorted)
+				clear(storage.Full)
+
+				// Если используется база, вычистим из неё "чужие" сокращения
+				if cfg.DBconnStr != "" {
+					err = repository.ClearDB(cfg)
+					if err != nil {
+						log.Println(err)
+						res.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+				}
+
+				// Если используется файл, вычистим из него "чужие" сокращения
+				if cfg.StorageFileName != "" {
+					err = os.Truncate(cfg.StorageFileName, 0)
+					if err != nil {
+						log.Println(err)
+						res.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+				}
+
 				tokenString, err = userauth.BuildJWTString()
 				if err != nil {
 					log.Println(err)
@@ -269,7 +294,6 @@ func UserURLS(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 				cookie := &http.Cookie{
 					Name:     "jwt",
 					Value:    tokenString,
-					Path:     "/api/user/urls",
 					Expires:  time.Now().Add(24 * time.Hour),
 					HttpOnly: true,
 					SameSite: http.SameSiteStrictMode,
