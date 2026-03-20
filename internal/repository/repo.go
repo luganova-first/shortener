@@ -176,12 +176,17 @@ func UpDBMigrations(db *sql.DB) error {
 	return nil
 }
 
-func ClearDB(db *sql.DB) error {
-	_, err := db.Exec("TRUNCATE TABLE shorts")
+func ClearDB(cfg *config.Config) error {
+	db, err := repository.DB(cfg)
 	if err != nil {
 		return err
 	}
 	defer db.Close()
+
+	_, err := db.Exec("TRUNCATE TABLE shorts")
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
