@@ -147,6 +147,16 @@ func UpDBMigrations(db *sql.DB) error {
 	return nil
 }
 
+func ClearDB(db *sql.DB) error {
+	_, err := db.Exec("TRUNCATE TABLE shorts")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	return nil
+}
+
 func FillStorage(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
 	switch {
 	case cfg.DBconnStr != "":
