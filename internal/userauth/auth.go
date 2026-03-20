@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v4"
 	"log"
+	"net/http"
 	"time"
 )
 
@@ -59,4 +60,37 @@ func BuildJWTString() (string, error) {
 
 	// возвращаем строку токена
 	return tokenString, nil
+}
+
+func SetUserCookie(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("jwt")
+		if err != nil {
+			if err == http.ErrNoCookie {
+				tokenString, err := BuildJWTString()
+				if err != nil {
+					log.Println(err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+
+				cookie = &http.Cookie{
+					Name:     "jwt",
+					Value:    tokenString,
+					Expires:  time.Now().Add(24 * time.Hour),
+					HttpOnly: true,
+					SameSite: http.SameSiteStrictMode,
+				}
+
+				http.SetCookie(w, cookie)
+			} else {
+				log.Println(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// передаём управление хендлеру
+		h.ServeHTTP(w, r)
+	})
 }

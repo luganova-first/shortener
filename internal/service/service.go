@@ -48,8 +48,6 @@ func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
 			// Если такой ключ уже есть, цикл повторится и сгенерируется новое значение ключа
 			if s.storage.Shorted[str] == "" {
 				cryptoString = str
-				s.storage.Shorted[cryptoString] = targetValue
-				s.storage.Full[targetValue] = cryptoString
 
 				break
 			}
@@ -59,6 +57,9 @@ func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
 			return "", fmt.Errorf("no cryptoString")
 		}
 	}
+
+	s.storage.Shorted[cryptoString] = targetValue
+	s.storage.Full[targetValue] = cryptoString
 
 	return cryptoString, nil
 }

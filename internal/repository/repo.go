@@ -98,6 +98,35 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 	return s, nil
 }
 
+func FillStorageFromDB(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
+	db, err := DB(cfg)
+	if err != nil {
+		return s, err
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(context.Background(), "SELECT shorted, full_url FROM shorts")
+	if err != nil {
+		return s, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var short string
+		var fullURL string
+
+		err = rows.Scan(&short, &fullURL)
+		if err != nil {
+			return s, err
+		}
+
+		s.Shorted[short] = fullURL
+		s.Full[fullURL] = short
+	}
+
+	return s, nil
+}
+
 func GetShortFromDB(cfg *config.Config, shortID string) string {
 	db, err := DB(cfg)
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"github.com/luganova-first/shortener/internal/logger"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
+	"github.com/luganova-first/shortener/internal/userauth"
 	"log"
 	"net/http"
 
@@ -41,5 +42,5 @@ func main() {
 		res.WriteHeader(http.StatusBadRequest)
 	})
 
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, archiver.GzipHandler(logger.WithLogging(r))))
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, archiver.GzipHandler(logger.WithLogging(userauth.SetUserCookie(r)))))
 }
