@@ -13,8 +13,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	// "os"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -39,14 +37,8 @@ type ResponseItem struct {
 	ShortURL      string `json:"short_url"`
 }
 
-// UserItem представляет один элемент ответа
-type UserItem struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
-
 // Хендлер сокращения url
-func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+func SetShort(storage *model.Storage, cfg *config.Config, users *userauth.Users) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `text/plain`
 		if req.Header.Get("Content-Type") != "text/plain" {
@@ -74,6 +66,19 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		var tokenString string
+		cookie, err := req.Cookie("jwt")
+		if err != nil {
+			log.Println(err)
+		} else {
+			tokenString = cookie.Value
+		}
+
+		userID := userauth.GetUserID(tokenString)
+		if userID < 0 {
+			userID = req.Context().Value("userID").(int)
+		}
+
 		s := service.NewShortenerService(storage, cfg)
 
 		res.Header().Set("content-type", "text/plain")
@@ -90,6 +95,13 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		} else {
 			res.WriteHeader(http.StatusCreated)
 		}
+
+		userItem := userauth.UserItem{
+			ShortURL:    shortURL,
+			OriginalURL: targetValue,
+		}
+
+		users.UserURLs[userID] = append(users.UserURLs[userID], userItem)
 
 		res.Write([]byte(shortURL))
 	}
@@ -253,106 +265,32 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 }
 
 // Хендлер получения всех сокращений пользователя
-func UserURLS(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+func UserURLS(users *userauth.Users) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		var tokenString string
 
 		cookie, err := req.Cookie("jwt")
 		if err != nil {
-			if err == http.ErrNoCookie {
-				// // Очистим "чужие" сокращения из памяти
-				// clear(storage.Shorted)
-				// clear(storage.Full)
-
-				// // Если используется база, вычистим из неё "чужие" сокращения
-				// if cfg.DBconnStr != "" {
-				// 	err = repository.ClearDB(cfg)
-				// 	if err != nil {
-				// 		log.Println(err)
-				// 		res.WriteHeader(http.StatusInternalServerError)
-				// 		return
-				// 	}
-				// }
-
-				// // Если используется файл, вычистим из него "чужие" сокращения
-				// if cfg.StorageFileName != "" {
-				// 	err = os.Truncate(cfg.StorageFileName, 0)
-				// 	if err != nil {
-				// 		log.Println(err)
-				// 		res.WriteHeader(http.StatusInternalServerError)
-				// 		return
-				// 	}
-				// }
-
-				tokenString, err = userauth.BuildJWTString()
-				if err != nil {
-					log.Println(err)
-					res.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-
-				cookie := &http.Cookie{
-					Name:     "jwt",
-					Value:    tokenString,
-					Expires:  time.Now().Add(24 * time.Hour),
-					HttpOnly: true,
-					SameSite: http.SameSiteStrictMode,
-				}
-
-				http.SetCookie(res, cookie)
-			} else {
-				log.Println(err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
+			log.Println(err)
 		} else {
 			tokenString = cookie.Value
 		}
 
-		s := service.NewShortenerService(storage, cfg)
-
 		userID := userauth.GetUserID(tokenString)
-		if userID != 17 {
+		if userID < 0 {
 			res.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		if cfg.DBconnStr != "" {
-			storage, err = repository.FillStorageFromDB(storage, cfg)
-			if err != nil {
-				log.Println(err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		}
-
-		if len(storage.Shorted) == 0 {
+		if len(users.UserURLs[userID]) == 0 {
 			res.WriteHeader(http.StatusNoContent)
 			return
-		}
-
-		// Создаем слайс для ответов
-		responses := make([]UserItem, 0, len(storage.Shorted))
-
-		for short, originalURL := range storage.Shorted {
-			shortURL, err := s.GetShortURL(short)
-			if err != nil {
-				log.Println(err)
-				res.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			// Добавляем результат в ответ
-			responses = append(responses, UserItem{
-				ShortURL:    shortURL,
-				OriginalURL: originalURL,
-			})
 		}
 
 		// Отправляем ответ
 		res.Header().Set("Content-Type", "application/json")
 		res.WriteHeader(http.StatusOK)
-		json.NewEncoder(res).Encode(responses)
+		json.NewEncoder(res).Encode(users.UserURLs[userID])
 	}
 }
 
