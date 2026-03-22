@@ -278,8 +278,12 @@ func UserURLS(users *userauth.Users) http.HandlerFunc {
 
 		userID := userauth.GetUserID(tokenString)
 		if userID < 0 {
-			res.WriteHeader(http.StatusUnauthorized)
-			return
+			userID = req.Context().Value("userID").(int)
+
+			if userID <= 0 {
+				res.WriteHeader(http.StatusUnauthorized)
+				return
+			}
 		}
 
 		if len(users.UserURLs[userID]) == 0 {
