@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/luganova-first/shortener/internal/config"
 	"github.com/luganova-first/shortener/internal/model"
+	"github.com/luganova-first/shortener/internal/userauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -14,14 +15,18 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"context"
 )
 
 var cfg *config.Config
 var storage *model.Storage
+var users *userauth.Users
 
 func TestSetShort(t *testing.T) {
 	cfg = config.NewConfig()
 	storage = model.NewStorage()
+	users = userauth.NewUsers()
+	userID := 17
 
 	var shortURL string
 
@@ -29,7 +34,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, cfg))
+		h := http.HandlerFunc(SetShort(storage, cfg, users))
 		h(w, request)
 
 		res := w.Result()
@@ -41,7 +46,7 @@ func TestSetShort(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/aaaaaaa", nil)
 		request.Header.Set("Content-Type", "text/plain")
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, cfg))
+		h := http.HandlerFunc(SetShort(storage, cfg, users))
 		h(w, request)
 
 		res := w.Result()
@@ -52,8 +57,11 @@ func TestSetShort(t *testing.T) {
 	t.Run("no body", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", nil)
 		request.Header.Set("Content-Type", "text/plain")
+		ctx := request.Context()
+		ctx = context.WithValue(ctx, "userID", userID)
+		request = request.WithContext(ctx)
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, cfg))
+		h := http.HandlerFunc(SetShort(storage, cfg, users))
 		h(w, request)
 
 		res := w.Result()
@@ -64,8 +72,11 @@ func TestSetShort(t *testing.T) {
 	t.Run("ok post", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
+		ctx := request.Context()
+		ctx = context.WithValue(ctx, "userID", userID)
+		request = request.WithContext(ctx)
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, cfg))
+		h := http.HandlerFunc(SetShort(storage, cfg, users))
 		h(w, request)
 
 		res := w.Result()
@@ -82,8 +93,11 @@ func TestSetShort(t *testing.T) {
 	t.Run("no duplicate", func(t *testing.T) {
 		request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://practicum.yandex.ru/"))
 		request.Header.Set("Content-Type", "text/plain")
+		ctx := request.Context()
+		ctx = context.WithValue(ctx, "userID", userID)
+		request = request.WithContext(ctx)
 		w := httptest.NewRecorder()
-		h := http.HandlerFunc(SetShort(storage, cfg))
+		h := http.HandlerFunc(SetShort(storage, cfg, users))
 		h(w, request)
 
 		res := w.Result()
