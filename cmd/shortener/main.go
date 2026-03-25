@@ -39,6 +39,7 @@ func main() {
 	r.Get("/ping", handler.GetDB(cfg))
 	r.Get("/api/user/urls", handler.UserURLS(users))
 	r.Get("/{shortID}", handler.GetShort(storage, cfg))
+	r.Delete("/api/user/urls", handler.DeleteShorts(users, storage, cfg))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)

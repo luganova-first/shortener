@@ -94,8 +94,6 @@ func BuildJWTString(users *Users, userID int) (string, error) {
 		return "", err
 	}
 
-	fmt.Println(tokenString)
-
 	// возвращаем строку токена
 	return tokenString, nil
 }
