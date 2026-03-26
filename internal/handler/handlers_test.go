@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/go-chi/chi/v5"
@@ -15,7 +16,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"context"
 )
 
 var cfg *config.Config
@@ -303,5 +303,101 @@ func TestBatchShort_Success(t *testing.T) {
 	for i, resp := range responses {
 		assert.Equal(t, requests[i].CorrelationID, resp.CorrelationID)
 		assert.NotEmpty(t, resp.ShortURL)
+	}
+}
+
+func TestUserURLS(t *testing.T) {
+	tests := []struct {
+		name           string
+		userID         int
+		setupUser      func(*userauth.Users, int)
+		setupContext   func(*http.Request, int)
+		cookie         *http.Cookie
+		expectedStatus int
+		expectedBody   []userauth.UserItem
+	}{
+		{
+			name:   "successful get user URLs",
+			userID: 1,
+			setupUser: func(users *userauth.Users, userID int) {
+				users.UserURLs[userID] = []userauth.UserItem{
+					{ShortURL: "abc123", OriginalURL: "https://example.com"},
+					{ShortURL: "def456", OriginalURL: "https://google.com"},
+				}
+			},
+			setupContext: func(req *http.Request, userID int) {
+				ctx := context.WithValue(req.Context(), "userID", userID)
+				*req = *req.WithContext(ctx)
+			},
+			expectedStatus: http.StatusOK,
+			expectedBody: []userauth.UserItem{
+				{ShortURL: "abc123", OriginalURL: "https://example.com"},
+				{ShortURL: "def456", OriginalURL: "https://google.com"},
+			},
+		},
+		{
+			name:   "no content when user has no URLs",
+			userID: 2,
+			setupUser: func(users *userauth.Users, userID int) {
+				users.UserURLs[userID] = []userauth.UserItem{}
+			},
+			setupContext: func(req *http.Request, userID int) {
+				ctx := context.WithValue(req.Context(), "userID", userID)
+				*req = *req.WithContext(ctx)
+			},
+			expectedStatus: http.StatusNoContent,
+			expectedBody:   nil,
+		},
+		{
+			name:   "unauthorized when userID is invalid",
+			userID: 0,
+			setupUser: func(users *userauth.Users, userID int) {
+				// no setup needed
+			},
+			setupContext: func(req *http.Request, userID int) {
+				ctx := context.WithValue(req.Context(), "userID", userID)
+				*req = *req.WithContext(ctx)
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			users := &userauth.Users{
+				UserURLs: make(map[int][]userauth.UserItem),
+			}
+
+			if tt.setupUser != nil {
+				tt.setupUser(users, tt.userID)
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
+			if tt.setupContext != nil {
+				tt.setupContext(req, tt.userID)
+			}
+
+			if tt.cookie != nil {
+				req.AddCookie(tt.cookie)
+			}
+
+			rr := httptest.NewRecorder()
+
+			// Execute
+			handler := UserURLS(users)
+			handler.ServeHTTP(rr, req)
+
+			// Assert
+			assert.Equal(t, tt.expectedStatus, rr.Code)
+
+			if tt.expectedBody != nil {
+				var response []userauth.UserItem
+				err := json.Unmarshal(rr.Body.Bytes(), &response)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedBody, response)
+			}
+		})
 	}
 }
