@@ -7,6 +7,7 @@ import (
 	"github.com/luganova-first/shortener/internal/logger"
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
+	"github.com/luganova-first/shortener/internal/userauth"
 	"log"
 	"net/http"
 
@@ -22,6 +23,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	users := userauth.NewUsers()
+
 	storage, err := repository.FillStorage(model.NewStorage(), cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -30,15 +33,17 @@ func main() {
 	r := chi.NewRouter()
 
 	// Передаем базовый URL в хендлер
-	r.Post("/", handler.SetShort(storage, cfg))
+	r.Post("/", handler.SetShort(storage, cfg, users))
 	r.Post("/api/shorten/batch", handler.BatchShort(storage, cfg))
 	r.Post("/api/shorten", handler.JSONShort(storage, cfg))
 	r.Get("/ping", handler.GetDB(cfg))
+	r.Get("/api/user/urls", handler.UserURLS(users))
 	r.Get("/{shortID}", handler.GetShort(storage, cfg))
+	r.Delete("/api/user/urls", handler.DeleteShorts(users, storage, cfg))
 
 	r.MethodNotAllowed(func(res http.ResponseWriter, req *http.Request) {
 		res.WriteHeader(http.StatusBadRequest)
 	})
 
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, archiver.GzipHandler(logger.WithLogging(r))))
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, archiver.GzipHandler(logger.WithLogging(userauth.SetUserCookie(r, users)))))
 }

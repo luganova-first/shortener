@@ -48,8 +48,6 @@ func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
 			// Если такой ключ уже есть, цикл повторится и сгенерируется новое значение ключа
 			if s.storage.Shorted[str] == "" {
 				cryptoString = str
-				s.storage.Shorted[cryptoString] = targetValue
-				s.storage.Full[targetValue] = cryptoString
 
 				break
 			}
@@ -59,6 +57,9 @@ func (s *ShortenerService) MakeShort(targetValue string) (string, error) {
 			return "", fmt.Errorf("no cryptoString")
 		}
 	}
+
+	s.storage.Shorted[cryptoString] = targetValue
+	s.storage.Full[targetValue] = cryptoString
 
 	return cryptoString, nil
 }
@@ -106,6 +107,16 @@ func (s *ShortenerService) SetBulkData(data map[string]string) error {
 	return nil
 }
 
+// DeleteBulkData удаляет множественные данные
+func (s *ShortenerService) DeleteBulkData(data []string) error {
+	err := repository.DeleteBulkStorageFromDB(s.config, data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetData получает данные по короткому идентификатору
 func (s *ShortenerService) GetData(shortID string) string {
 	if s.config.DBconnStr != "" {
@@ -115,7 +126,7 @@ func (s *ShortenerService) GetData(shortID string) string {
 	}
 }
 
-// GetData получает данные по короткому идентификатору
+// GetShortURL формирует url по короткому идентификатору
 func (s *ShortenerService) GetShortURL(short string) (string, error) {
 	baseURL := s.config.BaseURL
 

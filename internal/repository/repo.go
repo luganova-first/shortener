@@ -98,6 +98,35 @@ func FillStorageFromFile(s *model.Storage, cfg *config.Config) (*model.Storage, 
 	return s, nil
 }
 
+func FillStorageFromDB(s *model.Storage, cfg *config.Config) (*model.Storage, error) {
+	db, err := DB(cfg)
+	if err != nil {
+		return s, err
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(context.Background(), "SELECT shorted, full_url FROM shorts")
+	if err != nil {
+		return s, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var short string
+		var fullURL string
+
+		err = rows.Scan(&short, &fullURL)
+		if err != nil {
+			return s, err
+		}
+
+		s.Shorted[short] = fullURL
+		s.Full[fullURL] = short
+	}
+
+	return s, nil
+}
+
 func GetShortFromDB(cfg *config.Config, shortID string) string {
 	db, err := DB(cfg)
 	if err != nil {
@@ -106,13 +135,18 @@ func GetShortFromDB(cfg *config.Config, shortID string) string {
 	}
 	defer db.Close()
 
-	row := db.QueryRowContext(context.Background(), "SELECT full_url FROM shorts WHERE shorted = $1", shortID)
+	row := db.QueryRowContext(context.Background(), "SELECT full_url, is_deleted FROM shorts WHERE shorted = $1", shortID)
 
 	var fullURL string
-	err = row.Scan(&fullURL)
+	var isDeleted bool
+	err = row.Scan(&fullURL, &isDeleted)
 	if err != nil {
 		log.Println(err)
 		return ""
+	}
+
+	if isDeleted {
+		return "url is deleted"
 	}
 
 	return fullURL
@@ -143,6 +177,21 @@ func UpDBMigrations(db *sql.DB) error {
 		return fmt.Errorf("failed up migrations: %w", err)
 	}
 	defer db.Close()
+
+	return nil
+}
+
+func ClearDB(cfg *config.Config) error {
+	db, err := DB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, err = db.Exec("TRUNCATE TABLE shorts")
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -264,6 +313,32 @@ func WriteBulkStorageToDB(cfg *config.Config, data map[string]string) error {
 	}
 
 	query := fmt.Sprintf("INSERT INTO shorts (shorted, full_url) VALUES %s", strings.Join(valueStrings, ","))
+
+	_, err = db.Exec(query, valueArgs...)
+
+	return err
+}
+
+func DeleteBulkStorageFromDB(cfg *config.Config, data []string) error {
+	db, err := DB(cfg)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	valueStrings := make([]string, len(data))
+	valueArgs := make([]interface{}, len(data))
+	for i, shorted := range data {
+		valueStrings[i] = fmt.Sprintf("$%d", i+1)
+		valueArgs[i] = shorted
+	}
+
+	query := fmt.Sprintf(`
+        UPDATE shorts
+        SET is_deleted = true
+        WHERE shorted IN (%s)
+        AND is_deleted = false
+    `, strings.Join(valueStrings, ", "))
 
 	_, err = db.Exec(query, valueArgs...)
 

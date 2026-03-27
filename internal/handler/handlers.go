@@ -8,6 +8,7 @@ import (
 	"github.com/luganova-first/shortener/internal/model"
 	"github.com/luganova-first/shortener/internal/repository"
 	"github.com/luganova-first/shortener/internal/service"
+	"github.com/luganova-first/shortener/internal/userauth"
 	"io"
 	"log"
 	"net/http"
@@ -37,7 +38,7 @@ type ResponseItem struct {
 }
 
 // Хендлер сокращения url
-func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+func SetShort(storage *model.Storage, cfg *config.Config, users *userauth.Users) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		// POST запрос должен быть с Content-Type `text/plain`
 		if req.Header.Get("Content-Type") != "text/plain" {
@@ -65,6 +66,19 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		var tokenString string
+		cookie, err := req.Cookie("jwt")
+		if err != nil {
+			log.Println(err)
+		} else {
+			tokenString = cookie.Value
+		}
+
+		userID := userauth.GetUserID(tokenString)
+		if userID < 0 {
+			userID = req.Context().Value("userID").(int)
+		}
+
 		s := service.NewShortenerService(storage, cfg)
 
 		res.Header().Set("content-type", "text/plain")
@@ -81,6 +95,13 @@ func SetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		} else {
 			res.WriteHeader(http.StatusCreated)
 		}
+
+		userItem := userauth.UserItem{
+			ShortURL:    shortURL,
+			OriginalURL: targetValue,
+		}
+
+		users.UserURLs[userID] = append(users.UserURLs[userID], userItem)
 
 		res.Write([]byte(shortURL))
 	}
@@ -237,9 +258,127 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 			return
 		}
 
+		if fullURL == "url is deleted" {
+			res.WriteHeader(http.StatusGone)
+			return
+		}
+
 		res.Header().Set("Location", fullURL)
 		res.WriteHeader(http.StatusTemporaryRedirect)
 		res.Write([]byte(fullURL))
+	}
+}
+
+// Хендлер получения всех сокращений пользователя
+func UserURLS(users *userauth.Users) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		var tokenString string
+
+		cookie, err := req.Cookie("jwt")
+		if err != nil {
+			log.Println(err)
+		} else {
+			tokenString = cookie.Value
+		}
+
+		userID := userauth.GetUserID(tokenString)
+		if userID < 0 {
+			userID = req.Context().Value("userID").(int)
+
+			if userID <= 0 {
+				res.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		if len(users.UserURLs[userID]) == 0 {
+			res.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		// Отправляем ответ
+		res.Header().Set("Content-Type", "application/json")
+		res.WriteHeader(http.StatusOK)
+		json.NewEncoder(res).Encode(users.UserURLs[userID])
+	}
+}
+
+// Хендлер удаления сокращений пользователя
+func DeleteShorts(users *userauth.Users, storage *model.Storage, cfg *config.Config) http.HandlerFunc {
+	return func(res http.ResponseWriter, req *http.Request) {
+		var tokenString string
+
+		cookie, err := req.Cookie("jwt")
+		if err != nil {
+			log.Println(err)
+		} else {
+			tokenString = cookie.Value
+		}
+
+		userID := userauth.GetUserID(tokenString)
+		if userID < 0 {
+			userID = req.Context().Value("userID").(int)
+
+			if userID <= 0 {
+				res.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+		}
+
+		var buf bytes.Buffer
+
+		// читаем тело запроса
+		_, err = buf.ReadFrom(req.Body)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		var shortsForDelete []string
+		err = json.Unmarshal(buf.Bytes(), &shortsForDelete)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		defer req.Body.Close()
+
+		s := service.NewShortenerService(storage, cfg)
+
+		var dataForDelete []string
+
+		for _, shortForDelete := range shortsForDelete {
+			usersURLs := users.UserURLs[userID]
+
+			shortURL, err := s.GetShortURL(shortForDelete)
+			if err != nil {
+				log.Println(err)
+				res.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			var newUserURLs []userauth.UserItem
+			for _, item := range usersURLs {
+				if shortURL == item.ShortURL {
+					dataForDelete = append(dataForDelete, shortForDelete)
+				} else {
+					newUserURLs = append(newUserURLs, item)
+				}
+			}
+
+			users.UserURLs[userID] = newUserURLs
+		}
+
+		err = s.DeleteBulkData(dataForDelete)
+		if err != nil {
+			log.Println(err)
+			res.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		// Отправляем ответ
+		res.WriteHeader(http.StatusAccepted)
 	}
 }
 
