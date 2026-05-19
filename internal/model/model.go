@@ -23,3 +23,10 @@ func (s *Storage) GetShort(key string) string {
 func (s *Storage) GetFull(key string) string {
 	return s.Full[key]
 }
+
+type Audit struct {
+	Ts     int64  `json:"ts"`
+	Action string `json:"action"`
+	UserID int    `json:"user_id"`
+	URL    string `json:"url"`
+}
