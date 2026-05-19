@@ -344,3 +344,25 @@ func DeleteBulkStorageFromDB(cfg *config.Config, data []string) error {
 
 	return err
 }
+
+func WriteAuditToFile(cfg *config.Config, audit *model.Audit) error {
+	auditFileName := cfg.AuditFile
+
+	fileWriter, err := NewFileWriter(auditFileName)
+	if err != nil {
+		return err
+	}
+	defer fileWriter.Close()
+
+	// Создаем encoder с отступами для красивого форматирования
+	encoder := json.NewEncoder(fileWriter.file)
+	encoder.SetIndent("", " ")
+
+	// Записываем массив в файл
+	err = encoder.Encode(audit)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

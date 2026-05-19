@@ -13,6 +13,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -104,6 +105,15 @@ func SetShort(storage *model.Storage, cfg *config.Config, users *userauth.Users)
 		users.UserURLs[userID] = append(users.UserURLs[userID], userItem)
 
 		res.Write([]byte(shortURL))
+
+		audit := &model.Audit{
+			Ts:     time.Now().Unix(),
+			Action: "shorten",
+			UserID: userID,
+			URL:    targetValue,
+		}
+
+		SendAudit(cfg, audit)
 	}
 }
 
@@ -172,6 +182,14 @@ func JSONShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		}
 
 		res.Write(resp)
+
+		audit := &model.Audit{
+			Ts:     time.Now().Unix(),
+			Action: "shorten",
+			URL:    targetValue,
+		}
+
+		SendAudit(cfg, audit)
 	}
 }
 
@@ -266,6 +284,14 @@ func GetShort(storage *model.Storage, cfg *config.Config) http.HandlerFunc {
 		res.Header().Set("Location", fullURL)
 		res.WriteHeader(http.StatusTemporaryRedirect)
 		res.Write([]byte(fullURL))
+
+		audit := &model.Audit{
+			Ts:     time.Now().Unix(),
+			Action: "follow",
+			URL:    fullURL,
+		}
+
+		SendAudit(cfg, audit)
 	}
 }
 
@@ -394,5 +420,33 @@ func GetDB(cfg *config.Config) http.HandlerFunc {
 		defer db.Close()
 
 		res.WriteHeader(http.StatusOK)
+	}
+}
+
+func SendAudit(cfg *config.Config, audit *model.Audit) {
+	if cfg.AuditFile != "" {
+		err := service.AuditToFile(cfg, audit)
+		if err != nil {
+			log.Println("Ошибка записи аудита в файл:", err)
+			return
+		}
+	}
+
+	if cfg.AuditURL != "" {
+		// Сериализация в JSON
+		jsonData, err := json.Marshal(audit)
+		if err != nil {
+			log.Println("Ошибка сериализации:", err)
+			return
+		}
+
+		// Отправка POST запроса
+		url := cfg.AuditURL
+		resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			log.Println("Ошибка отправки:", err)
+			return
+		}
+		defer resp.Body.Close()
 	}
 }

@@ -137,3 +137,10 @@ func (s *ShortenerService) GetShortURL(short string) (string, error) {
 
 	return shortURL, nil
 }
+
+// AuditToFile сохраняет аудит в файл
+func AuditToFile(cfg *config.Config, audit *model.Audit) error {
+	err := repository.WriteAuditToFile(cfg, audit)
+
+	return err
+}

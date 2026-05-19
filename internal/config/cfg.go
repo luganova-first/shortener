@@ -13,6 +13,8 @@ type Config struct {
 	BaseURL         string // Базовый адрес для сокращенных URL
 	StorageFileName string // Имя файла для записи данных Storage
 	DBconnStr       string // Строка с адресом подключения к БД
+	AuditFile       string // Путь к файлу-приёмнику, в который сохраняются логи аудита
+	AuditURL        string // Полный URL удаленного сервера-приёмника, куда отправляются логи аудита.
 }
 
 // NewConfig создает и инициализирует конфигурацию из аргументов командной строки
@@ -27,6 +29,8 @@ func NewConfig() *Config {
 	baseURL := flag.String("b", "", "Базовый адрес результирующего сокращённого URL")
 	fileName := flag.String("f", defaultStorageFileName, "Файл для записи Storage")
 	dbStr := flag.String("d", "", "Строка с адресом подключения к БД")
+	auditFile := flag.String("audit-file", "", "Строка с путём к файлу-приёмнику")
+	auditURL := flag.String("audit-url", "", "Строка с URL удаленного сервера-приёмника")
 	flag.Parse()
 
 	var ok bool
@@ -75,8 +79,22 @@ func NewConfig() *Config {
 	// Берём настройки БД из переменной окружения
 	cfg.DBconnStr, ok = os.LookupEnv("DATABASE_DSN")
 	if !ok {
-		// Берём настроейк БД нет, определяем флаги
+		// Если настройки БД нет, определяем флаги
 		cfg.DBconnStr = *dbStr
+	}
+
+	// Берём путь к файлу-приёмнику из переменной окружения
+	cfg.AuditFile, ok = os.LookupEnv("AUDIT_FILE")
+	if !ok {
+		// Если пути к файлу-приёмнику нет, определяем флаги
+		cfg.AuditFile = *auditFile
+	}
+
+	// Берём URL удаленного сервера-приёмника из переменной окружения
+	cfg.AuditURL, ok = os.LookupEnv("AUDIT_URL")
+	if !ok {
+		// Если URL удаленного сервера-приёмника нет, определяем флаги
+		cfg.AuditURL = *auditURL
 	}
 
 	return cfg
